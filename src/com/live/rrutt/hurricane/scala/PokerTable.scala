@@ -5,6 +5,24 @@ import com.live.rrutt.prologfunctors._
 import com.live.rrutt.ui._
 
 object PokerTable {
+
+  val gCardSuit = List(
+    ('A', 14, 1), // High, Low value 
+    ('2', 2, 2), // Wild 
+    ('3', 3, 3),
+    ('4', 4, 4),
+    ('5', 5, 5),
+    ('6', 6, 6),
+    ('7', 7, 7),
+    ('8', 8, 8),
+    ('9', 9, 9),
+    ('T', 10, 10),
+    ('J', 11, 11),
+    ('Q', 12, 12),
+    ('K', 13, 13))
+  
+  var gCardDeckStock = new_deck
+  var gCardDeckDiscard = empty_deck
   
   def PlayPoker(p: HurricanePoker): Unit = {
     parent = p
@@ -36,7 +54,7 @@ object PokerTable {
     peekaboo
     val CHOICE = main_menu
     if (game_over(CHOICE)) {
-      return Unit
+      return
     }
     main_loop
   }
@@ -49,9 +67,27 @@ object PokerTable {
     return true
   }
   
-  def shuffle_deck_new = {}
+  def shuffle_deck_new = {
+    gCardDeckStock = new_deck
+    gCardDeckDiscard = empty_deck
+  }
   
-  def shuffle_deck_old = {}
+  def shuffle_deck_old = {
+    for (i <- 1 to 5) shuffle_deck_riffle    
+  }
+  
+  def shuffle_deck_riffle = {
+    debug_nl
+    debug_write("** Discard = "); debug_write(gCardDeckDiscard.toString); debug_nl
+    debug_write("   Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+    val deck = gCardDeckDiscard ::: gCardDeckStock
+    val (leftDeck, rightDeck) = deck partition(_ => Math.random < 0.5)
+    debug_write("   Left = "); debug_write(leftDeck.toString); debug_nl
+    debug_write("   Right = "); debug_write(rightDeck.toString); debug_nl
+    gCardDeckStock = leftDeck ::: rightDeck
+    gCardDeckDiscard = empty_deck
+    debug_write(">> New Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+  }
   
   def clear_player_amt_pot = {}
   
@@ -62,4 +98,21 @@ object PokerTable {
   def show_players_clear = {}
   
   def peekaboo = {}
+  
+  def new_deck: List[Tuple3[Char, Int, Int]] = {
+    val suit1 = gCardSuit
+    val suit2 = suit1 reverse
+    val suit3 = suit2
+    val suit4 = suit1
+    
+    val deck = suit1 ::: suit2 ::: suit3 ::: suit4
+    
+    return deck
+  }
+  
+  def empty_deck: List[Tuple3[Char, Int, Int]] = {
+    val deck = List[Tuple3[Char, Int, Int]]()
+    
+    return deck
+  }
 }
