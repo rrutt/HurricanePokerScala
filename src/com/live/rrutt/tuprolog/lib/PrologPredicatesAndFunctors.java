@@ -157,17 +157,17 @@ public class PrologPredicatesAndFunctors extends Library {
 		return true;
 	}
 
-	public boolean menu_3(Term arg0, Term arg1, Term arg2) throws Exception {
-		String menuCaption = stringValueFromTerm(arg0);
-		Struct choiceList = (Struct)arg1;
-		Term choiceTerm = arg2;
-		// logMsg("menu " + menuCaption + ": " + choiceList.toString());
-		MenuDialog md = new MenuDialog(new javax.swing.JFrame(), true,
-				menuCaption, choiceList);
-		md.setVisible(true);
-		int choice = md.choice();
-		return unify(choiceTerm, new alice.tuprolog.Int(choice));
-	}
+//	public boolean menu_3(Term arg0, Term arg1, Term arg2) throws Exception {
+//		String menuCaption = stringValueFromTerm(arg0);
+//		Struct choiceList = (Struct)arg1;
+//		Term choiceTerm = arg2;
+//		// logMsg("menu " + menuCaption + ": " + choiceList.toString());
+//		MenuDialog md = new MenuDialog(new javax.swing.JFrame(), true,
+//				menuCaption, choiceList);
+//		md.setVisible(true);
+//		int choice = md.choice();
+//		return unify(choiceTerm, new alice.tuprolog.Int(choice));
+//	}
 
 	public Term random_int_1(Term val0) throws Throwable {
 		Term result = new Var();

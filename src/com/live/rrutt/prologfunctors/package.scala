@@ -1,10 +1,11 @@
 package com.live.rrutt
 
 import com.live.rrutt.hurricane.HurricanePoker
+import com.live.rrutt.tuprolog.util._
 
 package object prologfunctors {
   
-  val debugging = true
+  val gPeekEnabled = true
 
   var parent: HurricanePoker = null
   
@@ -21,14 +22,14 @@ package object prologfunctors {
     parent.write(s)
   }
   
-  def debug_nl = {
-    if (debugging) {
+  def peek_nl = {
+    if (gPeekEnabled) {
       println
     }
   }
   
-  def debug_write(s: String) {
-    if (debugging) {
+  def peek_write(s: String) {
+    if (gPeekEnabled) {
       print(s)
     }
   }

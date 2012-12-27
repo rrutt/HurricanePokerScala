@@ -22,8 +22,10 @@ object PokerTable {
     ('J', 11, 11),
     ('Q', 12, 12),
     ('K', 13, 13))
-  
-  var gPlayerMode = new_player_mode_map("init")
+
+  var gPlayerDealer = 0
+  var gPlayerMode = new_player_text_map("init")
+  var gPlayerText = new_player_text_map("")
   var gPlayerAmountStake = new_player_amount_map(gPlayerInitialStake)
   var gPlayerAmountBet = new_player_amount_map(0)
   var gPlayerAmountHigh = new_player_amount_map(0)
@@ -39,6 +41,7 @@ object PokerTable {
     parent = p
     
     write("Rick Rutt's Hurricane Poker - Using Scala " + scala.util.Properties.versionString); nl;
+    write("  Java encoding: " + java.nio.charset.Charset.defaultCharset()); nl;
     
 	text_title(" Hurricane Poker w/ Scala ");
 	write(" Hurricane is two-card draw poker;");
@@ -63,19 +66,31 @@ object PokerTable {
   
   def main_loop: Unit = {
     peekaboo
-    val CHOICE = main_menu
-    if (game_over(CHOICE)) {
+    val choice = main_menu
+    if (game_over(choice)) {
       return
     }
     main_loop
   }
-  
+
   def main_menu: Int = {
-    return 0;
+    val choice = menu(" Main Menu ",
+      List(
+        "Deal",
+        "Players",
+        "New Deck",
+        "Exit Game"))
+
+    return choice
   }
   
-  def game_over(CHOICE: Int): Boolean = {
-    return true
+  def game_over(choice: Int): Boolean = {
+    val result = choice match {
+      case 4 => true
+      case _ => false
+    }
+    
+    return result
   }
   
   def shuffle_deck_new = {
@@ -88,18 +103,18 @@ object PokerTable {
   }
   
   def shuffle_deck_riffle = {
-//    debug_nl
-//    debug_write("** Discard = "); debug_write(gCardDeckDiscard.toString); debug_nl
-//    debug_write("   Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+//    peek_nl
+//    peek_write("** Discard = "); peek_write(gCardDeckDiscard.toString); peek_nl
+//    peek_write("   Stock = "); peek_write(gCardDeckStock.toString); peek_nl
 
     val deck = gCardDeckDiscard ::: gCardDeckStock
     val (leftDeck, rightDeck) = deck partition(_ => Math.random < 0.5)
     gCardDeckStock = leftDeck ::: rightDeck
     gCardDeckDiscard = empty_deck
     
-//    debug_write("   Left = "); debug_write(leftDeck.toString); debug_nl
-//    debug_write("   Right = "); debug_write(rightDeck.toString); debug_nl
-//    debug_write(">> New Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+//    peek_write("   Left = "); peek_write(leftDeck.toString); peek_nl
+//    peek_write("   Right = "); peek_write(rightDeck.toString); peek_nl
+//    peek_write(">> New Stock = "); peek_write(gCardDeckStock.toString); peek_nl
   }
   
   def clear_player_amt_pot = {
@@ -111,7 +126,7 @@ object PokerTable {
   }
 
   def initialize_players = {
-    gPlayerMode = new_player_mode_map("clear")
+    gPlayerMode = new_player_text_map("clear")
     val human = random_int(gPlayerCount)
     for ((player, mode) <- gPlayerMode) {
       if (player == human) {
@@ -129,9 +144,119 @@ object PokerTable {
         }
       }
     }
+    gPlayerDealer = random_int(gPlayerCount)
   }
   
-  def show_players_clear = {}
+  def show_players_clear = {
+    var gPlayerText = new_player_text_map("")
+	text_title(" Hurricane Poker ")
+	text_clear
+	for (p <- 1 to gPlayerCount) {
+	  text_nl; text_write("#"); text_write(p.toString)
+	}
+	show_players_human
+	show_players_dealer
+	show_players_pot
+  }
+
+  def show_players_human = {
+    val playerList = gPlayerMode toList
+    val humanPlayer = playerList find { case (p, m) => m.equals("human") }
+    humanPlayer foreach (pm => {
+      val (p, m) = pm
+      text_cursor(p, 0)
+      text_write("\u00f6") // Smiley face
+      val stake = gPlayerAmountStake(p)
+      text_cursor(gPlayerCount + 4, 1)
+      text_write("\u00f6 $"); text_write(stake.toString()); text_write("     ") // Smiley face
+    })
+  }
+  
+  def show_players_dealer = {
+	text_cursor(gPlayerDealer, 2)
+	text_write("\u2261")  // Triple-bar
+  }
+  
+/*
+  show_players(deal) :-
+	player_amt(P, stake, _),
+		text_cursor(P, 3),
+		text_write("  "),
+	  	player_hand(P, _, _),
+  			text_cursor(P, 3),
+  			text_write("--"),
+  			fail.
+  show_players(deal) :-
+  	player_hand(P, C1, C2),
+  		player_mode(P, human),
+  			text_cursor(P, 3),
+  			text_write(C1), text_write(C2),
+  			fail.
+  show_players(deal).
+
+  show_players(hands) :-
+  	player_hand(P, C1, C2),
+  		text_cursor(P, 3),
+  		text_write(C1), text_write(C2),
+  		fail.
+  show_players(hands).  % Terminate loop 
+*/
+  
+  def show_players_pot = {
+	text_cursor(gPlayerCount + 2, 1)
+	text_write("Pot: $"); text_write(gPotAmount.toString()); text_write("     ")
+  }
+/*
+  show_players(info) :-
+	text_title(" Player Information "),
+	text_clear,
+	player_amt(P, stake, A),
+	        str_int(SA, A),
+		text_cursor(P, 0),
+		text_write("#"), text_write(P), text_write(" $"), text_write(SA),
+		fail.
+  show_players(info) :-
+	player_mode(P, human),
+	text_cursor(P, 0),
+	text_write("\u00f6"),  // Smiley face 
+	fail.
+  show_players(info) :-
+	player_amt(P, high, A),
+	        str_int(SA, A),
+		text_cursor(P, 12),
+		text_write("Hi: "), text_write(SA),
+		fail.
+  show_players(info) :-
+	player_amt(P, low, A),
+	        str_int(SA, A),
+		text_cursor(P, 20),
+		text_write("Lo: "), text_write(SA),
+		fail.
+  show_players(info) :-
+  	player_amt(0, peek, 0),
+	player_mode(P, M),
+		M \= "dealer",
+		text_cursor(P, 28),
+		text_write(M),
+		fail.
+  show_players(info) :-
+  	player_amt(0, hand, A),
+        str_int(SA, A),
+  	text_cursor(10, 3),
+  	text_write("Hand #"), text_write(SA),
+  	fail.
+  show_players(info) :-
+  	!.
+
+  show_players(debug) :-
+	text_title(" Player Amounts "),
+	player_amt(P, X, A),
+	        str_int(SA, A),
+		write(" #"), write(P), write(":"), write(X), write("="), write(SA),
+		fail.
+  show_players(debug) :-
+  	ask_ok, !.
+  */
   
   def peekaboo = {}
   
@@ -152,9 +277,9 @@ object PokerTable {
     return deck
   }
   
-  def new_player_mode_map(initialValue: String): collection.mutable.Map[Int, String] = {    
-    val modeMap = (1 to gPlayerCount) map(p => (p, initialValue)) toMap
-    var mutableMap = collection.mutable.Map(modeMap.toSeq: _*)
+  def new_player_text_map(initialValue: String): collection.mutable.Map[Int, String] = {    
+    val textMap = (1 to gPlayerCount) map(p => (p, initialValue)) toMap
+    var mutableMap = collection.mutable.Map(textMap.toSeq: _*)
     
     return mutableMap
   }
@@ -169,6 +294,6 @@ object PokerTable {
   def assert_player_mode(player: Int, mode: String) {
     gPlayerMode(player) = mode
     
-//    debug_write("++ Player "); debug_write(player.toString); debug_write(" = "); debug_write(mode); debug_nl
+//    peek_write("++ Player "); peek_write(player.toString); peek_write(" = "); peek_write(mode); peek_nl
   }
 }
