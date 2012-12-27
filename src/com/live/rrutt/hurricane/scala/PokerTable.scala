@@ -24,6 +24,7 @@ object PokerTable {
     ('K', 13, 13))
 
   var gPlayerDealer = 0
+  var gPlayerHuman = 0
   var gPlayerMode = new_player_text_map("init")
   var gPlayerText = new_player_text_map("")
   var gPlayerAmountStake = new_player_amount_map(gPlayerInitialStake)
@@ -33,6 +34,8 @@ object PokerTable {
   var gPlayerAmountDraws = new_player_amount_map(0)
   var gPotAmount = 0
   var gHandNumber = 0
+  
+  var gPlayerPeek = false
   
   var gCardDeckStock = new_deck
   var gCardDeckDiscard = empty_deck
@@ -90,7 +93,77 @@ object PokerTable {
       case _ => false
     }
     
+    if (result) {
+      end_of_game
+    }
+    
     return result
+  }
+  
+  def end_of_game = {
+	text_title(" Game Over. ")
+	text_clear
+	
+	text_cursor(0, 1)
+	text_write("Won:")	
+    val winningPlayers = gPlayerAmountStake.toList.withFilter { case (p, a) => a > gPlayerInitialStake }
+    winningPlayers foreach (pa => {
+      val (p, a) = pa
+      text_cursor(p, 1)
+      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      if (p == gPlayerHuman) {
+	    text_cursor(p, 1)
+  	    text_write("\u00f6")  // Smiley face 
+      }
+    })
+
+	text_cursor(0, 10)
+	text_write("Even:")
+    val evenPlayers = gPlayerAmountStake.toList.withFilter { case (p, a) => a == gPlayerInitialStake }
+    evenPlayers foreach (pa => {
+      val (p, a) = pa
+      text_cursor(p, 10)
+      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      if (p == gPlayerHuman) {
+	    text_cursor(p, 10)
+  	    text_write("\u00f6")  // Smiley face 
+      }
+    })
+
+	text_cursor(0, 19)
+	text_write("Lost:")
+    val losingPlayers = gPlayerAmountStake.toList.withFilter { case (p, a) => (a >= 0) && (a < gPlayerInitialStake) }
+    winningPlayers foreach (pa => {
+      val (p, a) = pa
+      text_cursor(p, 19)
+      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      if (p == gPlayerHuman) {
+	    text_cursor(p, 19)
+  	    text_write("\u00f6")  // Smiley face 
+      }
+    })
+
+	text_cursor(0, 28)
+	text_write("In Debt:")
+    val debtorPlayers = gPlayerAmountStake.toList.withFilter { case (p, a) => a < 0 }
+    debtorPlayers foreach (pa => {
+      val (p, a) = pa
+      text_cursor(p, 28)
+      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      if (p == gPlayerHuman) {
+	    text_cursor(p, 28)
+  	    text_write("\u00f6")  // Smiley face 
+      }
+    })
+
+  	text_cursor(10, 1)
+  	text_write("(Original stakes were $"); text_write(gPlayerInitialStake.toString()); text_write(")")
+	text_cursor(12, 1)
+  	text_write("Hand #"); text_write(gHandNumber.toString()); text_nl
+  	ask_ok_0
+  	gPlayerPeek = true
+	show_players_info
+	ask_ok_1("Game Over.")
   }
   
   def shuffle_deck_new = {
@@ -127,10 +200,12 @@ object PokerTable {
 
   def initialize_players = {
     gPlayerMode = new_player_text_map("clear")
-    val human = random_int(gPlayerCount)
+    gPlayerHuman = random_int(gPlayerCount)
+    gPlayerDealer = random_int(gPlayerCount)
+
     for ((player, mode) <- gPlayerMode) {
-      if (player == human) {
-        assert_player_mode(human, "human")
+      if (player == gPlayerHuman) {
+        assert_player_mode(gPlayerHuman, "human")
       } else {
         val n = random_int(7)
         n match {
@@ -144,7 +219,6 @@ object PokerTable {
         }
       }
     }
-    gPlayerDealer = random_int(gPlayerCount)
   }
   
   def show_players_clear = {
@@ -160,16 +234,11 @@ object PokerTable {
   }
 
   def show_players_human = {
-    val playerList = gPlayerMode toList
-    val humanPlayer = playerList find { case (p, m) => m.equals("human") }
-    humanPlayer foreach (pm => {
-      val (p, m) = pm
-      text_cursor(p, 0)
-      text_write("\u00f6") // Smiley face
-      val stake = gPlayerAmountStake(p)
-      text_cursor(gPlayerCount + 4, 1)
-      text_write("\u00f6 $"); text_write(stake.toString()); text_write("     ") // Smiley face
-    })
+    text_cursor(gPlayerHuman, 0)
+    text_write("\u00f6") // Smiley face
+    val stake = gPlayerAmountStake(gPlayerHuman)
+    text_cursor(gPlayerCount + 4, 1)
+    text_write("\u00f6 $"); text_write(stake.toString()); text_write("     ") // Smiley face
   }
   
   def show_players_dealer = {
@@ -206,48 +275,38 @@ object PokerTable {
 	text_cursor(gPlayerCount + 2, 1)
 	text_write("Pot: $"); text_write(gPotAmount.toString()); text_write("     ")
   }
-/*
-  show_players(info) :-
-	text_title(" Player Information "),
-	text_clear,
-	player_amt(P, stake, A),
-	        str_int(SA, A),
-		text_cursor(P, 0),
-		text_write("#"), text_write(P), text_write(" $"), text_write(SA),
-		fail.
-  show_players(info) :-
-	player_mode(P, human),
-	text_cursor(P, 0),
-	text_write("\u00f6"),  // Smiley face 
-	fail.
-  show_players(info) :-
-	player_amt(P, high, A),
-	        str_int(SA, A),
-		text_cursor(P, 12),
-		text_write("Hi: "), text_write(SA),
-		fail.
-  show_players(info) :-
-	player_amt(P, low, A),
-	        str_int(SA, A),
-		text_cursor(P, 20),
-		text_write("Lo: "), text_write(SA),
-		fail.
-  show_players(info) :-
-  	player_amt(0, peek, 0),
-	player_mode(P, M),
-		M \= "dealer",
-		text_cursor(P, 28),
-		text_write(M),
-		fail.
-  show_players(info) :-
-  	player_amt(0, hand, A),
-        str_int(SA, A),
-  	text_cursor(10, 3),
-  	text_write("Hand #"), text_write(SA),
-  	fail.
-  show_players(info) :-
-  	!.
 
+  def show_players_info = {
+	text_title(" Player Information ")
+	text_clear
+	
+    gPlayerAmountStake.toList.foreach(pa => {
+      val (p, a) = pa
+      text_cursor(p, 0)
+      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      
+      if (p == gPlayerHuman) {
+	    text_cursor(p, 0)
+  	    text_write("\u00f6")  // Smiley face 
+      }
+      
+      text_cursor(p, 12)
+      text_write("Hi: "); text_write(gPlayerAmountHigh(p).toString())
+      
+      text_cursor(p, 20)
+      text_write("Lo: "); text_write(gPlayerAmountLow(p).toString())
+      
+      if (gPlayerPeek) {
+        text_cursor(p, 28)
+        text_write(gPlayerMode(p))
+      }
+    })
+
+    text_cursor(10, 3)
+  	text_write("Hand #"); text_write(gHandNumber.toString())
+  }
+
+  /*
   show_players(debug) :-
 	text_title(" Player Amounts "),
 	player_amt(P, X, A),

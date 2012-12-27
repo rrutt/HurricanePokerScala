@@ -63,4 +63,30 @@ package object ui {
     
     return choice
   }
+
+  def ask_ok_0: Boolean = {
+    val msg = "Click to proceed.";
+    val okd = new OkDialog(new javax.swing.JFrame(), true, msg);
+    okd.setVisible(true);
+    val ok = okd.isOk();
+
+    return ok;
+  }
+
+  def ask_ok_1(text: String): Boolean = {
+    val okd = new OkDialog(new javax.swing.JFrame(), true, text);
+    okd.setVisible(true);
+    val ok = okd.isOk();
+
+    return ok;
+  }
+
+  def ask_ok_2(text0: String, text1: String): Boolean = {
+    val msg = text0 + text1;
+    val okd = new OkDialog(new javax.swing.JFrame(), true, msg);
+    okd.setVisible(true);
+    val ok = okd.isOk();
+
+    return ok;
+  }
 }
