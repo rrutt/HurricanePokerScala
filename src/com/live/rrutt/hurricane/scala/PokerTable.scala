@@ -5,10 +5,12 @@ import com.live.rrutt.prologfunctors._
 import com.live.rrutt.ui._
 
 object PokerTable {
-
+  val gPlayerCount = 8
+  val gPlayerInitialStake = 100
+  
   val gCardSuit = List(
     ('A', 14, 1), // High, Low value 
-    ('2', 2, 2), // Wild 
+    ('2', 2, 2),  // Wild 
     ('3', 3, 3),
     ('4', 4, 4),
     ('5', 5, 5),
@@ -20,6 +22,15 @@ object PokerTable {
     ('J', 11, 11),
     ('Q', 12, 12),
     ('K', 13, 13))
+  
+  var gPlayerMode = new_player_mode_map("init")
+  var gPlayerAmountStake = new_player_amount_map(gPlayerInitialStake)
+  var gPlayerAmountBet = new_player_amount_map(0)
+  var gPlayerAmountHigh = new_player_amount_map(0)
+  var gPlayerAmountLow = new_player_amount_map(0)
+  var gPlayerAmountDraws = new_player_amount_map(0)
+  var gPotAmount = 0
+  var gHandNumber = 0
   
   var gCardDeckStock = new_deck
   var gCardDeckDiscard = empty_deck
@@ -44,7 +55,7 @@ object PokerTable {
 	nl; write(" Shuffled new deck "); nl; bang;
 	clear_player_amt_pot;
 	clear_player_amt_hand;
-	set_player_init;
+	initialize_players;
 	show_players_clear;
 	main_loop;
 	text_close;    
@@ -77,23 +88,48 @@ object PokerTable {
   }
   
   def shuffle_deck_riffle = {
-    debug_nl
-    debug_write("** Discard = "); debug_write(gCardDeckDiscard.toString); debug_nl
-    debug_write("   Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+//    debug_nl
+//    debug_write("** Discard = "); debug_write(gCardDeckDiscard.toString); debug_nl
+//    debug_write("   Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+
     val deck = gCardDeckDiscard ::: gCardDeckStock
     val (leftDeck, rightDeck) = deck partition(_ => Math.random < 0.5)
-    debug_write("   Left = "); debug_write(leftDeck.toString); debug_nl
-    debug_write("   Right = "); debug_write(rightDeck.toString); debug_nl
     gCardDeckStock = leftDeck ::: rightDeck
     gCardDeckDiscard = empty_deck
-    debug_write(">> New Stock = "); debug_write(gCardDeckStock.toString); debug_nl
+    
+//    debug_write("   Left = "); debug_write(leftDeck.toString); debug_nl
+//    debug_write("   Right = "); debug_write(rightDeck.toString); debug_nl
+//    debug_write(">> New Stock = "); debug_write(gCardDeckStock.toString); debug_nl
   }
   
-  def clear_player_amt_pot = {}
+  def clear_player_amt_pot = {
+    gPotAmount = 0
+  }
   
-  def clear_player_amt_hand = {}
-  
-  def set_player_init = {}
+  def clear_player_amt_hand = {
+    gHandNumber = 0
+  }
+
+  def initialize_players = {
+    gPlayerMode = new_player_mode_map("clear")
+    val human = random_int(gPlayerCount)
+    for ((player, mode) <- gPlayerMode) {
+      if (player == human) {
+        assert_player_mode(human, "human")
+      } else {
+        val n = random_int(7)
+        n match {
+          case 1 => assert_player_mode(player, "random")
+          case 2 => assert_player_mode(player, "checker")
+          case 3 => assert_player_mode(player, "pairwise")
+          case 4 => assert_player_mode(player, "highrise")
+          case 5 => assert_player_mode(player, "lowdown")
+          case 6 => assert_player_mode(player, "hilo")
+          case 7 => assert_player_mode(player, "foldout")
+        }
+      }
+    }
+  }
   
   def show_players_clear = {}
   
@@ -114,5 +150,25 @@ object PokerTable {
     val deck = List[Tuple3[Char, Int, Int]]()
     
     return deck
+  }
+  
+  def new_player_mode_map(initialValue: String): collection.mutable.Map[Int, String] = {    
+    val modeMap = (1 to gPlayerCount) map(p => (p, initialValue)) toMap
+    var mutableMap = collection.mutable.Map(modeMap.toSeq: _*)
+    
+    return mutableMap
+  }
+  
+  def new_player_amount_map(initialValue: Int): collection.mutable.Map[Int, Int] = {    
+    val amountMap = (1 to gPlayerCount) map(p => (p, initialValue)) toMap
+    var mutableMap = collection.mutable.Map(amountMap.toSeq: _*)
+    
+    return mutableMap
+  }
+  
+  def assert_player_mode(player: Int, mode: String) {
+    gPlayerMode(player) = mode
+    
+//    debug_write("++ Player "); debug_write(player.toString); debug_write(" = "); debug_write(mode); debug_nl
   }
 }
