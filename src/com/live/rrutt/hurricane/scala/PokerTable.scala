@@ -60,7 +60,7 @@ object PokerTable {
 	nl;
 	shuffle_deck_new;
 	shuffle_deck_old;
-	nl; write(" Shuffled new deck "); nl; bang;
+	nl; write(" Shuffled new deck. "); nl; bang;
 	clear_player_amt_pot;
 	clear_player_amt_hand;
 	initialize_players;
@@ -105,7 +105,7 @@ object PokerTable {
       case 3 => {
         shuffle_deck_new
         shuffle_deck_old
-	    nl; write(" Shuffled new deck "); nl
+	    nl; write(" Shuffled new deck. "); nl
         return choice
       }
       case 4 => {
@@ -397,17 +397,17 @@ object PokerTable {
 
     for ((player, mode) <- gPlayerMode) {
       if (player == gPlayerHuman) {
-        assert_player_mode(gPlayerHuman, "human")
+        gPlayerMode(gPlayerHuman) = "human"
       } else {
         val n = random_int(7)
         n match {
-          case 1 => assert_player_mode(player, "random")
-          case 2 => assert_player_mode(player, "checker")
-          case 3 => assert_player_mode(player, "pairwise")
-          case 4 => assert_player_mode(player, "highrise")
-          case 5 => assert_player_mode(player, "lowdown")
-          case 6 => assert_player_mode(player, "hilo")
-          case 7 => assert_player_mode(player, "foldout")
+          case 1 => gPlayerMode(player) = "random"
+          case 2 => gPlayerMode(player) = "checker"
+          case 3 => gPlayerMode(player) = "pairwise"
+          case 4 => gPlayerMode(player) = "highrise"
+          case 5 => gPlayerMode(player) = "lowdown"
+          case 6 => gPlayerMode(player) = "hilo"
+          case 7 => gPlayerMode(player) = "foldout"
         }
       }
     }
@@ -562,12 +562,6 @@ object PokerTable {
     var mutableMap = collection.mutable.Map(handMap.toSeq: _*)
     
     return mutableMap
-  }
-  
-  def assert_player_mode(player: Int, mode: String) {
-    gPlayerMode(player) = mode
-    
-//    peek_write("++ Player "); peek_write(player.toString); peek_write(" = "); peek_write(mode); peek_nl
   }
 
   // TODO: Remove this when player hand includes each card as Tuple3[String, Int, Int].
