@@ -9,19 +9,19 @@ object PokerTable {
   val gPlayerInitialStake = 100
   
   val gCardSuit = List(
-    ('A', 14, 1), // High, Low value 
-    ('2', 2, 2),  // Wild 
-    ('3', 3, 3),
-    ('4', 4, 4),
-    ('5', 5, 5),
-    ('6', 6, 6),
-    ('7', 7, 7),
-    ('8', 8, 8),
-    ('9', 9, 9),
-    ('T', 10, 10),
-    ('J', 11, 11),
-    ('Q', 12, 12),
-    ('K', 13, 13))
+    ("A", 14, 1), // High, Low value 
+    ("2", 2, 2),  // Wild 
+    ("3", 3, 3),
+    ("4", 4, 4),
+    ("5", 5, 5),
+    ("6", 6, 6),
+    ("7", 7, 7),
+    ("8", 8, 8),
+    ("9", 9, 9),
+    ("T", 10, 10),
+    ("J", 11, 11),
+    ("Q", 12, 12),
+    ("K", 13, 13))
 
   var gPlayerDealer = 0
   var gPlayerHuman = 0
@@ -32,8 +32,10 @@ object PokerTable {
   var gPlayerAmountHigh = new_player_amount_map(0)
   var gPlayerAmountLow = new_player_amount_map(0)
   var gPlayerAmountDraws = new_player_amount_map(0)
+  var gPlayerHand = new_player_hand_map
   var gPotAmount = 0
   var gHandNumber = 0
+  var gDrawCount = 0
   
   var gPlayerPeek = false
   
@@ -44,7 +46,7 @@ object PokerTable {
     parent = p
     
     write("Rick Rutt's Hurricane Poker - Using Scala " + scala.util.Properties.versionString); nl;
-    write("  Java encoding: " + java.nio.charset.Charset.defaultCharset()); nl;
+//    write("  Java encoding: " + java.nio.charset.Charset.defaultCharset()); nl;
     
 	text_title(" Hurricane Poker w/ Scala ");
 	write(" Hurricane is two-card draw poker;");
@@ -84,9 +86,145 @@ object PokerTable {
         "New Deck",
         "Exit Game"))
 
+    process(choice)
+    
     return choice
   }
+
+  def process(choice: Int): Int = {
+    choice match {
+      case 1 => {
+        process_round_deal
+        return choice
+      }
+      case 2 => {
+        gPlayerPeek = false
+        show_players_info
+        return choice
+      }
+      case 3 => {
+        shuffle_deck_new
+        shuffle_deck_old
+	    nl; write(" Shuffled new deck "); nl
+        return choice
+      }
+      case 4 => {
+        val ok = ask_yes_no_1("Do you want to quit?")
+        if (ok) {
+          return choice
+        } else {
+          return 0
+        }
+      }
+    }
+  }
+
+  def process_round_deal = {
+  	show_players_clear
+  	deal_cards_start
+  	gDrawCount = 0
+//	process_round_bet
+//	process_round_draw
+//	process_round_bet
+	ask_ok_1(" Ready for Showdown! ")
+  	show_players_hands
+//  	decide_hands
+  }
+
+  /*
+  process_round(bet) :-
+	player_amt(P, stake, _),
+		clear_player_amt(P, bet),
+		fail.
+  process_round(bet) :-
+	player_mode(D, dealer),
+	next(D, P),
+  	player_round(bet, P, 8, 3, 0, 0).
+
+  process_round(draw) :-
+	player_mode(D, dealer),
+	next(D, P),
+  	player_round(draw, P, 8, 0, 0, 0),
+  	show_players(deal).
+*/
+
+  def deal_cards_start = {
+    gHandNumber += 1
+  	deal_cards_ante
+  	deal_cards_around
+  	deal_cards_around
+  	show_players_deal
+  	show_players_pot
+  	show_players_human
+  	ask_ok_1(" Ready for betting. ")
+  }
+
+  def deal_cards_ante = {
+//    for (p <- 1 to gPlayerCount) {
+//      make_player_bet(p, 1)
+//    }
+  }
+
+  def deal_cards_around = {
+    for (p <- 1 to gPlayerCount) {
+      deal_a_card(p)
+    }
+  }
   
+  def deal_cards_done = {
+    for (p <- 1 to gPlayerCount) {
+      val hand = gPlayerHand(p)
+      gPlayerHand(p) = ("*", "*")
+
+      val (c1, c2) = hand
+      
+      val c1hi = card_high_value(c1)
+      val c1lo = card_low_value(c1)
+      
+      val c2hi = card_high_value(c2)
+      val c2lo = card_low_value(c2)
+      
+      if (c1hi > 0) {
+        gCardDeckDiscard ::= (c1, c1hi, c1lo)
+      }
+      
+      if (c2hi > 0) {
+        gCardDeckDiscard ::= (c2, c2hi, c2lo)
+      }      
+    }
+  } 
+  
+  def deal_a_card(p: Int) = {
+    val card = gCardDeckStock.head
+    gCardDeckStock = gCardDeckStock.tail
+  	deal_to_player(p, card)
+  }
+
+  def deal_to_player(p: Int, card: Tuple3[String, Int, Int]) = {  
+    // Sorts as "high" card followed by "low" card
+  	val (cc, chi, clo) = card
+
+  	val hand = gPlayerHand(p)
+  	val (c1, c2) = hand
+  	val d1 = card_high_value(c1)
+  	val d2 = card_high_value(c2)
+  	
+  	hand match {
+  	  case ("*", "*") => {
+  	    gPlayerHand(p) = (cc, "*")
+  	  }
+  	  case (c1, "*") if chi > d1 => {
+  	    gPlayerHand(p) = (cc, c1)
+  	  }
+  	  case (c1, "*") => {
+  	    gPlayerHand(p) = (c1, cc)
+  	  }
+  	  case _ => {
+  	    // Already had two cards.
+  	  }
+  	}
+  }
+
   def game_over(choice: Int): Boolean = {
     val result = choice match {
       case 4 => true
@@ -245,31 +383,31 @@ object PokerTable {
 	text_cursor(gPlayerDealer, 2)
 	text_write("\u2261")  // Triple-bar
   }
-  
-/*
-  show_players(deal) :-
-	player_amt(P, stake, _),
-		text_cursor(P, 3),
-		text_write("  "),
-	  	player_hand(P, _, _),
-  			text_cursor(P, 3),
-  			text_write("--"),
-  			fail.
-  show_players(deal) :-
-  	player_hand(P, C1, C2),
-  		player_mode(P, human),
-  			text_cursor(P, 3),
-  			text_write(C1), text_write(C2),
-  			fail.
-  show_players(deal).
 
-  show_players(hands) :-
-  	player_hand(P, C1, C2),
-  		text_cursor(P, 3),
-  		text_write(C1), text_write(C2),
-  		fail.
-  show_players(hands).  % Terminate loop 
-*/
+  def show_players_deal = {
+    gPlayerAmountStake.toList.foreach(pa => {
+      val (p, a) = pa
+      text_cursor(p, 3)
+      text_write("--")
+      if (p == gPlayerHuman) {
+        val hand = gPlayerHand(p)
+        val (c1, c2) = hand
+        text_cursor(p, 3)
+        text_write(c1); text_write(c2)
+      }
+    })
+  }
+
+  def show_players_hands = {
+    gPlayerAmountStake.toList.foreach(pa => {
+      val (p, a) = pa
+      text_cursor(p, 3)
+      val hand = gPlayerHand(p)
+      val (c1, c2) = hand
+      text_cursor(p, 3)
+      text_write(c1); text_write(c2)
+    })
+  }
   
   def show_players_pot = {
 	text_cursor(gPlayerCount + 2, 1)
@@ -306,20 +444,24 @@ object PokerTable {
   	text_write("Hand #"); text_write(gHandNumber.toString())
   }
 
-  /*
-  show_players(debug) :-
-	text_title(" Player Amounts "),
-	player_amt(P, X, A),
-	        str_int(SA, A),
-		write(" #"), write(P), write(":"), write(X), write("="), write(SA),
-		fail.
-  show_players(debug) :-
-  	ask_ok, !.
-  */
+  def show_players_debug = {
+    text_title(" Player Amounts ")
+    gPlayerAmountStake.toList.foreach(pa => {
+      val (p, a) = pa
+      text_cursor(p, 0)
+      text_write("#"); text_write(p.toString()); text_write("="); text_write(a.toString())
+
+      if (p == gPlayerHuman) {
+        text_cursor(p, 0)
+        text_write("\u00f6") // Smiley face 
+      }
+    })
+    ask_ok_0
+  }
   
   def peekaboo = {}
   
-  def new_deck: List[Tuple3[Char, Int, Int]] = {
+  def new_deck: List[Tuple3[String, Int, Int]] = {
     val suit1 = gCardSuit
     val suit2 = suit1 reverse
     val suit3 = suit2
@@ -330,8 +472,8 @@ object PokerTable {
     return deck
   }
   
-  def empty_deck: List[Tuple3[Char, Int, Int]] = {
-    val deck = List[Tuple3[Char, Int, Int]]()
+  def empty_deck: List[Tuple3[String, Int, Int]] = {
+    val deck = List[Tuple3[String, Int, Int]]()
     
     return deck
   }
@@ -350,9 +492,31 @@ object PokerTable {
     return mutableMap
   }
   
+  def new_player_hand_map: collection.mutable.Map[Int, Tuple2[String, String]] = {
+    val emptyHand = ("*", "*")
+    val handMap = (1 to gPlayerCount) map(p => (p, emptyHand)) toMap
+    var mutableMap = collection.mutable.Map(handMap.toSeq: _*)
+    
+    return mutableMap
+  }
+  
   def assert_player_mode(player: Int, mode: String) {
     gPlayerMode(player) = mode
     
 //    peek_write("++ Player "); peek_write(player.toString); peek_write(" = "); peek_write(mode); peek_nl
+  }
+  
+  def card_low_value(card: String): Int = {
+    val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
+    val (c, hi, lo) = optionCard.getOrElse(("*", 0, 0))
+    
+    return lo
+  }
+  
+  def card_high_value(card: String): Int = {
+    val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
+    val (c, hi, lo) = optionCard.getOrElse(("*", 0, 0))
+    
+    return hi
   }
 }

@@ -89,4 +89,30 @@ package object ui {
 
     return ok;
   }
+
+  def ask_yes_no_0: Boolean = {
+    val msg = "Click to proceed.";
+    val ynd = new YesNoDialog(new javax.swing.JFrame(), true, msg);
+    ynd.setVisible(true);
+    val ok = ynd.yes();
+
+    return ok;
+  }
+
+  def ask_yes_no_1(text: String): Boolean = {
+    val ynd = new YesNoDialog(new javax.swing.JFrame(), true, text);
+    ynd.setVisible(true);
+    val ok = ynd.yes();
+
+    return ok;
+  }
+
+  def ask_yes_no_2(text0: String, text1: String): Boolean = {
+    val msg = text0 + text1;
+    val ynd = new YesNoDialog(new javax.swing.JFrame(), true, msg);
+    ynd.setVisible(true);
+    val ok = ynd.yes();
+
+    return ok;
+  }
 }
