@@ -128,7 +128,7 @@ object PokerTable {
 //	process_round_bet
 	ask_ok_1(" Ready for Showdown! ")
   	show_players_hands
-//  	decide_hands
+  	decide_hands
   }
 
   /*
@@ -192,15 +192,17 @@ object PokerTable {
         gCardDeckDiscard ::= (c2, c2hi, c2lo)
       }      
     }
-  } 
-  
-  def deal_a_card(p: Int) = {
-    val card = gCardDeckStock.head
-    gCardDeckStock = gCardDeckStock.tail
-  	deal_to_player(p, card)
   }
 
-  def deal_to_player(p: Int, card: Tuple3[String, Int, Int]) = {  
+  def deal_a_card(p: Int) = {
+    val card = gCardDeckStock.head
+    val dealt = deal_to_player(p, card)
+    if (dealt) {
+      gCardDeckStock = gCardDeckStock.tail
+    }
+  }
+
+  def deal_to_player(p: Int, card: Tuple3[String, Int, Int]): Boolean = {  
     // Sorts as "high" card followed by "low" card
   	val (cc, chi, clo) = card
 
@@ -212,18 +214,70 @@ object PokerTable {
   	hand match {
   	  case ("*", "*") => {
   	    gPlayerHand(p) = (cc, "*")
+  	    return true
   	  }
   	  case (c1, "*") if chi > d1 => {
   	    gPlayerHand(p) = (cc, c1)
+  	    return true
   	  }
   	  case (c1, "*") => {
   	    gPlayerHand(p) = (c1, cc)
+  	    return true
   	  }
   	  case _ => {
   	    // Already had two cards.
+  	    return false
   	  }
   	}
   }
+
+  def decide_hands = {
+	show_players_pot
+	show_players_human
+    gPlayerDealer = next_player(gPlayerDealer)
+  	deal_cards_done
+  	shuffle_deck_old
+  }
+/*  
+  decide_hands :-
+  	player_hand_score(P, HL, V),
+  		retract_player_hand_score(P, HL, V),
+  		fail.  % Loop to erase old scores 
+  decide_hands :-
+  	player_hand(P, C1, C2),
+  		hand_value(high, C1,C2, VH),
+  		decide_player_hand(P, high, VH),
+  		hand_value(low,  C1,C2, VL),
+  		decide_player_hand(P, low, VL),
+  		fail.  % Loop for all hands 
+  decide_hands :-
+  	player_hand_score(P, low, _),
+  		add_player_amt(P, low, 1),
+  		text_cursor(P, 2),
+  		text_write("▼"),
+  		fail.  % Loop for any ties 
+  decide_hands :-
+  	player_hand_score(P, high, _),
+  		add_player_amt(P, high, 1),
+  		text_cursor(P, 5),
+  		text_write("▲"),
+  		fail.  % Loop for any ties 
+  decide_hands :-  % Terminate loop 
+	findall(P, player_hand_score(P, low,  _), LP_LIST),
+	pay_winners(count, low, LP_LIST, 0, NL),
+	findall(P, player_hand_score(P, high, _), HP_LIST),
+	pay_winners(count, high, HP_LIST, 0, NH),
+	player_amt(0, pot, A),
+	AL is (A // 2) // NL,  % Odd extra goes to High winners 
+	AH is (A - (AL * NL)) // NH,  % Odd breakage stays as ante 
+	pay_winners(pay, low, LP_LIST, AL, _),
+	pay_winners(pay, high, HP_LIST, AH, _),
+	show_players(pot),
+	show_players(human),
+  	set_player(dealer),
+  	deal_cards(done),
+  	shuffle_deck(old).
+*/
 
   def game_over(choice: Int): Boolean = {
     val result = choice match {
@@ -358,6 +412,15 @@ object PokerTable {
       }
     }
   }
+
+  def next_player(player: Int): Int = {
+    val next = player match {
+      case p if p == gPlayerCount => 1
+      case _ => player + 1
+    }
+    
+    return next;
+  }
   
   def show_players_clear = {
     var gPlayerText = new_player_text_map("")
@@ -491,7 +554,8 @@ object PokerTable {
     
     return mutableMap
   }
-  
+
+  // TODO: Store player hand as Tuple2[Tuple3[String, Int, Int], Tuple3[String, Int, Int]].
   def new_player_hand_map: collection.mutable.Map[Int, Tuple2[String, String]] = {
     val emptyHand = ("*", "*")
     val handMap = (1 to gPlayerCount) map(p => (p, emptyHand)) toMap
@@ -505,7 +569,8 @@ object PokerTable {
     
 //    peek_write("++ Player "); peek_write(player.toString); peek_write(" = "); peek_write(mode); peek_nl
   }
-  
+
+  // TODO: Remove this when player hand includes each card as Tuple3[String, Int, Int].
   def card_low_value(card: String): Int = {
     val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
     val (c, hi, lo) = optionCard.getOrElse(("*", 0, 0))
@@ -513,6 +578,7 @@ object PokerTable {
     return lo
   }
   
+  // TODO: Remove this when player hand includes each card as Tuple3[String, Int, Int].
   def card_high_value(card: String): Int = {
     val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
     val (c, hi, lo) = optionCard.getOrElse(("*", 0, 0))
