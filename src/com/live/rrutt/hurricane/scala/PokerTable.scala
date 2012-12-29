@@ -296,8 +296,14 @@ object PokerTable {
   	    
   	    return actionBetAmount
       }
-      case _ => {
-        return ("call", 0) // TODO: Temporary stub.
+      case "checker" => {
+        return ("call", 0)
+      }
+      case _ => {  // "random"
+        val index = random_int(5) - 1
+        val actionBetAmount = get_action_bet_index(index, remainingBets)
+  	    
+  	    return actionBetAmount
       }
     }
   }
@@ -501,22 +507,30 @@ object PokerTable {
   get_action(bet, _, _, _, _, _, call, 0).   % Safety net 
 
   get_action(draw, _, _, _, _, _, keep, 0).  % Safety net 
-
-
-  get_action(bet, index, _, 0, _, _, call, 0).
-  get_action(bet, index, _, N, 0, _, call, 0) :-
-  	N < 4.
-  get_action(bet, index, _, N, R, _, raise, B) :-
-  	R > 0,
-  	N > 0,
-  	N < 4,
-  	B = N.
-  get_action(bet, index, _, 4, _, _, fold, 0).
-
-  get_action(draw, index, _, 0, _, _, keep, 0).
-  get_action(draw, index, _, 1, _, _, low, 0).
-  get_action(draw, index, _, 2, _, _, high, 0).
 */
+
+  // Returns (action, betAmount)
+  def get_action_bet_index(index: Int, remainingBets: Int): (String, Int) = {
+    val actionBetAmount = (index, remainingBets) match {
+      case (0, _) => ("call", 0)
+      case (4, _) => ("fold", 0)
+      case (c, 0) if c < 4 => ("call", 0)
+      case (c, _) if c < 4 => ("raise", index)
+      case _ => ("call", 0)  // Safety net.
+    }
+    
+    return actionBetAmount
+  }
+  
+  def get_action_draw_choice(choice: Int): String = {
+    val action = choice match {
+      case 1 => "low"
+      case 2 => "high"
+      case _ => "keep"
+    }
+    
+    return action
+  }
 
   // Returns (action, betAmount)
   def bet_menu(remainingBets: Int, callAmount: Int): (String, Int) = {
@@ -763,7 +777,7 @@ object PokerTable {
 	text_cursor(0, 19)
 	text_write("Lost:")
     val losingPlayers = gPlayerAmountStake.toList.withFilter { case (p, a) => (a >= 0) && (a < gPlayerInitialStake) }
-    winningPlayers foreach (pa => {
+    losingPlayers foreach (pa => {
       val (p, a) = pa
       text_cursor(p, 19)
       text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
@@ -779,7 +793,7 @@ object PokerTable {
     debtorPlayers foreach (pa => {
       val (p, a) = pa
       text_cursor(p, 28)
-      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      text_write("#"); text_write(p.toString()); text_write(" "); text_write(a.toString())
       if (p == gPlayerHuman) {
 	    text_cursor(p, 28)
   	    text_write("\u00f6")  // Smiley face 
@@ -920,7 +934,11 @@ object PokerTable {
     gPlayerAmountStake.toList.foreach(pa => {
       val (p, a) = pa
       text_cursor(p, 0)
-      text_write("#"); text_write(p.toString()); text_write(" $"); text_write(a.toString())
+      val signText = a match {
+        case x if x < 0 => " "
+        case _ => " $"
+      }
+      text_write("#"); text_write(p.toString()); text_write(signText); text_write(a.toString())
       
       if (p == gPlayerHuman) {
 	    text_cursor(p, 0)
