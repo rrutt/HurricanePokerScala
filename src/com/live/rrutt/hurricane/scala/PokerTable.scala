@@ -5,6 +5,7 @@ import com.live.rrutt.prologfunctors._
 import com.live.rrutt.ui._
 
 object PokerTable {
+  val gMaxBetsPerRound = 3
   val gPlayerCount = 8
   val gPlayerInitialStake = 100
   
@@ -123,29 +124,426 @@ object PokerTable {
   	show_players_clear
   	deal_cards_start
   	gDrawCount = 0
-//	process_round_bet
-//	process_round_draw
-//	process_round_bet
+	process_round_bet
+	process_round_draw
+	process_round_bet
 	ask_ok_1(" Ready for Showdown! ")
   	show_players_hands
   	decide_hands
   }
 
-  /*
-  process_round(bet) :-
-	player_amt(P, stake, _),
-		clear_player_amt(P, bet),
-		fail.
-  process_round(bet) :-
-	player_mode(D, dealer),
-	next(D, P),
-  	player_round(bet, P, 8, 3, 0, 0).
+  def process_round_bet = {
+    gPlayerAmountBet = new_player_amount_map(0)
+    val firstPlayerToAct = next_player(gPlayerDealer)
+  	player_round_bet(firstPlayerToAct, gPlayerCount, gMaxBetsPerRound, 0)
+  }
 
-  process_round(draw) :-
-	player_mode(D, dealer),
-	next(D, P),
-  	player_round(draw, P, 8, 0, 0, 0),
-  	show_players(deal).
+  def process_round_draw = {
+    val firstPlayerToAct = next_player(gPlayerDealer)
+//  	player_round_draw(firstPlayerToAct, gPlayerCount)
+  	show_players_deal
+  }
+
+  def player_round_bet(player: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): Unit = {
+    remainingPlayers match {
+      case 0 => {
+        show_players_pot
+        show_players_human
+        return // Terminate recursion.
+      }
+      case _ => {
+        val playerHand = gPlayerHand(player)
+        playerHand match {
+          case ("x", "x") => {
+            // Player folded.
+            val nextPlayer = next_player(player)
+            val stillRemainingPlayers = remainingPlayers - 1
+            player_round_bet(nextPlayer, stillRemainingPlayers, remainingBets, totalBet)
+          }
+          case _ => {
+            val mode = gPlayerMode(player)
+            val (action, betAmount) = get_action_bet(mode, player, remainingPlayers, remainingBets, totalBet)
+            process_player_bet_action(player, action, betAmount, remainingPlayers, remainingBets, totalBet)
+          }
+        }
+      }
+    }
+  }
+  
+  /*
+  player_round(bet, P, N, R, T, _) :-
+  	N > 0,
+  	player_hand(P, _, _), !,  % Player still in 
+	player_mode(P, M),
+		M \= "dealer",
+		get_action(bet, M, P, N, R, T, ACT, B),
+		player_round(ACT, P, N, R, T, B).
+  player_round(bet, P, N, R, T, _) :-  % Player folded 
+  	N > 0, !,
+	next(P, NP),
+	N1 is N - 1,
+	player_round(bet, NP, N1, R, T, 0).
+  }
+*/
+  
+  /*
+  player_round(draw, _, 0, _, _, _) :-  % Terminate recursion 
+        !.
+  player_round(draw, P, N, R, _, _) :-
+  	N > 0,
+  	player_hand(P, _, _), !, % Player still in 
+	player_mode(P, M),
+		M \= "dealer",
+		get_action(draw, M, P, N, R, 0, ACT, _),
+		player_round(ACT, P, N, 0, 0, 0).
+  player_round(draw, P, N, _, _, _) :-  % Player folded 
+  	N > 0, !,
+	next(P, NP),
+	N1 is N - 1,
+	player_round(draw, NP, N1, 0, 0, 0).
+*/
+  
+  def process_player_bet_action(player: Int, action: String, betAmount: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int) = {
+    action match {
+      case "call" => {
+        val playerBet = gPlayerAmountBet(player)
+        playerBet match {
+          case b if b == totalBet => {
+            gPlayerText(player) += "# "
+            write("Player "); write(player.toString()); write(" checks"); nl
+          }
+          case _ => {
+            val callAmount = totalBet - playerBet
+            make_player_bet(player, callAmount)
+            gPlayerText(player) += ("=" + callAmount.toString())
+            write("Player "); write(player.toString()); write(" calls $"); write(callAmount.toString()); nl
+          }
+        }
+        val nextPlayer = next_player(player)
+        val stillRemainingPlayers = remainingPlayers - 1
+        player_round_bet(nextPlayer, stillRemainingPlayers, remainingBets, totalBet)
+      }
+      case _ => {
+        // TODO: Temporary stub.
+        write("Player "); write(player.toString()); write(" "); write(action); write("="); write(betAmount.toString()); nl
+        val nextPlayer = next_player(player)
+        val stillRemainingPlayers = remainingPlayers - 1
+        player_round_bet(nextPlayer, stillRemainingPlayers, remainingBets, totalBet)
+      }
+    }
+  }
+
+  /*
+  player_round(raise, P, N, 0, T, _) :- !,  % Past max. # raises, call instead 
+  	player_round(call, P, N, 0, T, 0). 
+  player_round(raise, P, _, R, T, A) :-
+	R > 0, !,
+	player_amt(P, bet, B),
+	TA is T + A,
+	TB is TA - B,
+	make_player_bet(P, TB),
+	str_int(SA, A),
+	text_concat("+", SA, S),
+	add_player_text(P, S),
+	write("Player "), write(P), write(" raises $"), write(A), nl,
+	next(P, NP),
+	R1 is R - 1,
+	N1 is 8 - 1,
+	player_round(bet, NP, N1, R1, TA, 0).
+
+  player_round(call, P, N, R, T, _) :-
+	player_amt(P, bet, B),
+	T = B, !,
+	add_player_text(P, "# "),
+	write("Player "), write(P), write(" checks"), nl,
+	next(P, NP),
+	N1 is N - 1,
+	player_round(bet, NP, N1, R, T, 0).
+  player_round(call, P, N, R, T, _) :-
+	player_amt(P, bet, B), !,
+	TB is T - B,
+	make_player_bet(P, TB),
+	str_int(STB, TB),
+	text_concat("=", STB, S),
+	add_player_text(P, S),
+	write("Player "), write(P), write(" calls $"), write(TB), nl,
+	next(P, NP),
+	N1 is N - 1,
+	player_round(bet, NP, N1, R, T, 0).
+
+  player_round(fold, P, N, R, 0, _) :-  % Convert fold to check 
+  	player_round(call, P, N, R, 0, 0), !.
+  player_round(fold, P, N, R, T, _) :-
+  	T > 0, !,
+  	player_hand(P, C1, C2),
+  	retract_player_hand(P, C1, C2),
+	denomination_value(C1, D1, _),  % Use "high" value 
+	assertz_card_deck(discard, D1),
+	denomination_value(C2, D2, _),  % Use "high" value 
+	assertz_card_deck(discard, D2),
+	add_player_text(P, "x "),
+	write("Player "), write(P), write(" folds"), nl,
+	text_cursor(P, 3),
+	text_write("  "),
+	next(P, NP),
+	N1 is N - 1,
+	player_round(bet, NP, N1, R, T, 0).
+
+  player_round(keep, P, N, _, _, _) :-
+	add_player_text(P, "- "), !,
+	write("Player "), write(P), write(" keeps both cards"), nl,
+	next(P, NP),
+	N1 is N - 1,
+	player_round(draw, NP, N1, 0, 0, 0).
+  player_round(high, P, N, _, _, _) :-
+	add_player_text(P, "± "), !,  % Plus-or-minus 
+	write("Player "), write(P), write(" draws a card"), nl,
+	add_player_amt(0, draws, 1),
+	player_hand(P, C1, C2),
+	retract_player_hand(P, C1, C2),
+	assertz(player_hand(P, C2, '*')),
+	denomination_value(C1, D1, _),  % Use "high" value 
+	assertz_card_deck(discard, D1),
+	deal_a_card(P),
+	next(P, NP),
+	N1 is N - 1,
+	player_round(draw, NP, N1, 0, 0, 0).
+  player_round(low, P, N, _, _, _) :-
+	add_player_text(P, "± "), !,  % Plus-or-minus 
+	write("Player "), write(P), write(" draws a card"), nl,
+	add_player_amt(0, draws, 1),
+	player_hand(P, C1, C2),
+	retract_player_hand(P, C1, C2),
+	assertz(player_hand(P, C1, '*')),
+	denomination_value(C2, D2, _),  % Use "high" value 
+	assertz_card_deck(discard, D2),
+	deal_a_card(P),
+	next(P, NP),
+	N1 is N - 1,
+	player_round(draw, NP, N1, 0, 0, 0).
+	*/
+
+  // val (action, betAmount) = get_action_bet(mode, player, remainingPlayers, remainingBets, totalBet)
+  def get_action_bet(mode: String, player: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): (String, Int) = {
+    val decision = ("call", 0) // TODO: Temporary stub.
+    
+    return decision
+  }
+  
+/*
+  get_action(bet, random, P, _, R, T, ACT, B) :-
+  	N is random_int(5),
+  	get_action(bet, index, P, N, R, T, ACT, B).
+
+  get_action(draw, random, P, _, _, _, ACT, B) :-
+  	X is random_int(3),
+  	get_action(draw, index, P, X, 0, 0, ACT, B).
+
+
+  get_action(bet, checker, _, _, _, _, call, 0).
+
+  get_action(draw, checker, _, _, _, _, keep, 0).
+
+
+  get_action(bet, pairwise, P, _, _, _, raise, 3) :-  % Raise on wild 
+  	player_hand(P, _, '2'), !.
+  get_action(bet, pairwise, P, _, _, _, raise, 3) :-  % Raise on A,K,Q pair 
+  	player_hand(P, C1, C2),
+  	C1 = C2,
+	denomination_value(C1, D1, _),  % Use "high" value 
+	D1 > 11, !.  	
+  get_action(bet, pairwise, P, _, _, _, raise, 2) :-  % Raise on pair 
+  	player_hand(P, C1, C2),
+  	C1 = C2, !.
+  get_action(bet, pairwise, P, _, _, _, raise, 1) :-  % Raise on face card 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D > 10, !.  	
+  get_action(bet, pairwise, _, _, _, _, raise, 1) :-  % Defensive raise 
+  	player_amt(0, draws, 0), !.  % Only before draw 
+  get_action(bet, pairwise, _, _, _, T, fold, 0) :-  % Fold if big bet without pair 
+  	player_amt(0, draws, N), N > 0,  % Only after draw 
+  	T > 2, !.
+  get_action(bet, pairwise, _, _, _, _, call, 0).
+
+  get_action(draw, pairwise, P, N, R, T, ACT, B) :-  % Same as highrise 
+	get_action(draw, highrise, P, N, R, T, ACT, B).
+
+
+  get_action(bet, highrise, P, _, _, _, raise, 3) :-  % Raise on wild 
+  	player_hand(P, _, '2'), !.
+  get_action(bet, highrise, P, _, _, _, raise, 3) :-  % Raise on A,K,Q pair 
+  	player_hand(P, C1, C2),
+  	C1 = C2,
+	denomination_value(C1, D1, _),  % Use "high" value 
+	D1 > 11, !.  	
+  get_action(bet, highrise, P, _, _, _, raise, 2) :-  % Raise on pair 
+  	player_hand(P, C1, C2),
+  	C1 = C2, !.
+  get_action(bet, highrise, P, _, _, _, raise, 1) :-  % Raise on A,K,Q 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D > 11, !.
+  get_action(bet, highrise, P, _, _, _, fold, 0) :-  % Fold if poor high card 
+  	player_amt(0, draws, 0),  % Only before draw 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	D1 < 10, !.
+  get_action(bet, highrise, P, _, _, _, fold, 0) :-  % Fold if "medium" 
+  	player_amt(0, draws, N), N > 0,  % Only after draw 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	D1 > 5, D1 < 12, !.
+  get_action(bet, highrise, _, _, _, _, raise, 1) :-  % Defensive raise 
+  	player_amt(0, draws, 0), !.  % Only before draw 
+  get_action(bet, highrise, _, _, _, T, fold, 0) :-  % Fold if BIG bet 
+  	player_amt(0, draws, N), N > 0,  % Only after draw 
+  	T > 6, !.
+  get_action(bet, highrise, _, _, _, _, call, 0) :- !.
+
+  get_action(draw, highrise, P, _, _, _, keep, 0) :-  % Hold on pair 
+  	player_hand(P, C1, C2),
+  	C1 = C2, !.
+  get_action(draw, highrise, P, _, _, _, keep, 0) :-  % Hold on wild, face 
+  	player_hand(P, C, '2'),
+	denomination_value(C, D, _),  % Use "high" value 
+	D > 10, !.
+  get_action(draw, highrise, P, _, _, _, high, 0) :-  % Try for higher wild 
+  	player_hand(P, _, '2'), !.
+  get_action(draw, highrise, _, _, _, _, low, 0).  % Toss low card 
+
+
+  get_action(bet, lowdown, P, _, _, _, raise, 3) :-
+  	player_hand(P, 'A', '2'), !.
+  get_action(bet, lowdown, P, _, _, _, raise, 2) :-
+  	player_hand(P, 'A', _), !.
+  get_action(bet, lowdown, P, _, _, _, raise, 1) :-  % Raise on low hi-card 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D < 7, !.
+  get_action(bet, lowdown, P, _, _, _, fold, 0) :-  % Fold if high low-card 
+  	player_amt(0, draws, 0),  % Only before draw 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C2, D2, _),  % Use "high" value 
+	D2 > 6, !.
+  get_action(bet, lowdown, P, _, _, T, fold, 0) :-  % Fold if not low and big bet 
+  	player_amt(0, draws, N), N > 0,  % Only after draw 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	D1 > 6,
+	T > 1, !.
+  get_action(bet, lowdown, _, _, _, _, call, 0).
+
+  get_action(draw, lowdown, P, _, _, _, keep, 0) :-
+  	player_hand(P, 'A', '2'), !.
+  get_action(draw, lowdown, P, _, _, _, keep, 0) :-  % Hold if low hi-card 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D < 7, !.
+  get_action(draw, lowdown, _, _, _, _, high, 0).
+
+
+  get_action(bet, hilo, P, _, _, _, raise, 3) :-
+  	player_hand(P, 'A', '2'), !.
+  get_action(bet, hilo, P, _, _, _, raise, 2) :-
+  	player_hand(P, 'A', _), !.
+  get_action(bet, hilo, P, _, _, _, raise, 2) :-  % Raise on low hi-card 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D < 7, !.
+  get_action(bet, hilo, P, _, _, T, fold, 0) :-  % Fold if both medium and big bet 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	denomination_value(C2, D2, _),  % Use "high" value 
+	D1 > 6, D1 < 10,
+	D2 > 6, D2 < 10,
+	T > 1, !.
+  get_action(bet, hilo, P, _, _, _, raise, 1) :-  % Defensive raise if both medium 
+  	player_amt(0, draws, N), N > 0,  % Only after draw 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	denomination_value(C2, D2, _),  % Use "high" value 
+	D1 > 6, D1 < 10,
+	D2 > 6, D2 < 10, !.
+  get_action(bet, hilo, P, N, R, T, ACT, B) :-  % Else, same as highrise 
+	get_action(bet, highrise, P, N, R, T, ACT, B).
+
+  get_action(draw, hilo, P, _, _, _, keep, 0) :-
+  	player_hand(P, 'A', '2'), !.
+  get_action(draw, hilo, P, _, _, _, keep, 0) :-  % Hold if low hi-card 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D < 6, !.
+  get_action(draw, hilo, P, _, _, _, high, 0) :-  % Discard poor high if good low card 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Hold on pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	denomination_value(C2, D2, _),
+	D1 < 12,
+	D2 < 6, !.
+  get_action(draw, hilo, P, N, R, T, ACT, B) :-  % Else, same as highrise 
+	get_action(draw, highrise, P, N, R, T, ACT, B).
+
+
+  get_action(bet, foldout, P, _, _, _, raise, 3) :-
+  	player_hand(P, 'A', '2'), !.
+  get_action(bet, foldout, P, _, _, _, raise, 2) :-
+  	player_hand(P, 'A', _), !.
+  get_action(bet, foldout, P, _, _, _, raise, 2) :-  % Raise on low hi-card 
+  	player_hand(P, C, _),
+	denomination_value(C, D, _),  % Use "high" value 
+	D < 6, !.
+  get_action(bet, foldout, P, _, _, _, fold, 0) :-  % Fold if both medium and big bet 
+  	player_hand(P, C1, C2),
+  	C1 \= C2,  % Stay on a pair 
+	denomination_value(C1, D1, _),  % Use "high" value 
+	denomination_value(C2, D2, _),  % Use "high" value 
+	D1 > 5, D1 < 12,
+	D2 > 5, D2 < 12, !.
+  get_action(bet, foldout, P, N, R, T, ACT, B) :-  % Else, same as hilo 
+	get_action(bet, hilo, P, N, R, T, ACT, B).
+
+  get_action(draw, foldout, P, N, R, T, ACT, B) :-  % Else, same as hilo 
+	get_action(draw, hilo, P, N, R, T, ACT, B).
+
+
+  get_action(bet, human, P, _, R, T, ACT, B) :-
+  	show_players(pot),
+  	show_players(human),
+  	player_amt(P, bet, PB),
+  	CB is T - PB,  % Call bet amount 
+	peekaboo,
+  	bet_menu(R, CB, ACT, B).
+
+  get_action(draw, human, P, _, _, _, ACT, 0) :-
+	peekaboo,
+  	draw_menu(P, ACT).
+
+
+  get_action(bet, _, _, _, _, _, call, 0).   % Safety net 
+
+  get_action(draw, _, _, _, _, _, keep, 0).  % Safety net 
+
+
+  get_action(bet, index, _, 0, _, _, call, 0).
+  get_action(bet, index, _, N, 0, _, call, 0) :-
+  	N < 4.
+  get_action(bet, index, _, N, R, _, raise, B) :-
+  	R > 0,
+  	N > 0,
+  	N < 4,
+  	B = N.
+  get_action(bet, index, _, 4, _, _, fold, 0).
+
+  get_action(draw, index, _, 0, _, _, keep, 0).
+  get_action(draw, index, _, 1, _, _, low, 0).
+  get_action(draw, index, _, 2, _, _, high, 0).
 */
 
   def deal_cards_start = {
