@@ -35,7 +35,7 @@ package object prologfunctors {
   }
   
   def random_int(n: Int): Int = {
-    val d = new java.lang.Double(1 + (Math.random * n))
+    val d = new java.lang.Double(1 + (scala.math.random * n))
     val i = d.intValue
     
     return i

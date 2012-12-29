@@ -86,9 +86,9 @@ object PokerTable {
         "New Deck",
         "Exit Game"))
 
-    process(choice)
+    val confirmedChoice = process(choice)
     
-    return choice
+    return confirmedChoice
   }
 
   def process(choice: Int): Int = {
@@ -373,7 +373,7 @@ object PokerTable {
 //    peek_write("   Stock = "); peek_write(gCardDeckStock.toString); peek_nl
 
     val deck = gCardDeckDiscard ::: gCardDeckStock
-    val (leftDeck, rightDeck) = deck partition(_ => Math.random < 0.5)
+    val (leftDeck, rightDeck) = deck partition(_ => scala.math.random < 0.5)
     gCardDeckStock = leftDeck ::: rightDeck
     gCardDeckDiscard = empty_deck
     
