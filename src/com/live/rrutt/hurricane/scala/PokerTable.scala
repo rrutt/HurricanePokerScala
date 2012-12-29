@@ -160,9 +160,9 @@ object PokerTable {
   }
 
   def deal_cards_ante = {
-//    for (p <- 1 to gPlayerCount) {
-//      make_player_bet(p, 1)
-//    }
+    for (p <- 1 to gPlayerCount) {
+      make_player_bet(p, 1)
+    }
   }
 
   def deal_cards_around = {
@@ -229,6 +229,12 @@ object PokerTable {
   	    return false
   	  }
   	}
+  }
+  
+  def make_player_bet(player: Int, bet: Int) = {
+    gPlayerAmountStake(player) -= bet
+    gPlayerAmountBet(player) += bet
+    gPotAmount += bet
   }
 
   def decide_hands = {
