@@ -8,6 +8,7 @@ object PokerTable {
   val gMaxBetsPerRound = 3
   val gPlayerCount = 8
   val gPlayerInitialStake = 100
+  val gWorstBetValue = -99000
   val gCardEmpty = " "
   val gCardFolded = "x"
   val gHandEmpty = (gCardEmpty, gCardEmpty)
@@ -101,6 +102,7 @@ object PokerTable {
   def process(choice: Int): Int = {
     choice match {
       case 1 => {
+        gPlayerText = new_player_text_map("")
         process_round_deal
         return choice
       }
@@ -146,9 +148,8 @@ object PokerTable {
 
   def process_round_draw = {
     val firstPlayerToAct = next_player(gPlayerDealer)
-//  	player_round_draw(firstPlayerToAct, gPlayerCount)
+  	player_round_draw(firstPlayerToAct, gPlayerCount)
   	show_players_deal
-	ask_ok_1(" (Draw cards...) ")  // TODO: Temporary marker prompt.
   }
 
   def player_round_bet(player: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): Unit = {
@@ -177,22 +178,30 @@ object PokerTable {
     }
   }
 
-  /*
-  player_round(draw, _, 0, _, _, _) :-  % Terminate recursion 
-        !.
-  player_round(draw, P, N, R, _, _) :-
-  	N > 0,
-  	player_hand(P, _, _), !, % Player still in 
-	player_mode(P, M),
-		M \= "dealer",
-		get_action(draw, M, P, N, R, 0, ACT, _),
-		player_round(ACT, P, N, 0, 0, 0).
-  player_round(draw, P, N, _, _, _) :-  % Player folded 
-  	N > 0, !,
-	next(P, NP),
-	N1 is N - 1,
-	player_round(draw, NP, N1, 0, 0, 0).
-*/
+  def player_round_draw(player: Int, remainingPlayers: Int): Unit = {
+    remainingPlayers match {
+      case 0 => {
+        return // Terminate recursion.
+      }
+      case _ => {
+        val playerHand = gPlayerHand(player)
+        playerHand match {
+          case h if h == gHandFolded => {
+            // Player folded; do nothing.
+          }
+          case _ => {
+            val mode = gPlayerMode(player)
+            val action = get_action_draw(mode, player)
+            process_player_draw_action(player, action)
+          }
+        }
+      }
+      
+      val nextPlayer = next_player(player)
+      val stillRemainingPlayers = remainingPlayers - 1
+      player_round_draw(nextPlayer, stillRemainingPlayers)
+    }
+  }
 
   def process_player_bet_action(player: Int, action: String, betAmount: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): Unit = {
     action match {
@@ -250,14 +259,35 @@ object PokerTable {
       }
     }
   }
+  
+  def process_player_draw_action(player: Int, action: String) = {
+    action match {
+      case "high" => {
+        val (toss, keep) = gPlayerHand(player)
+        draw_player_card(player, keep, toss)
+      }
+      case "low" => {
+        val (keep, toss) = gPlayerHand(player)
+        draw_player_card(player, keep, toss)
+      }
+      case _ => {
+        // "keep"
+        add_player_text(player, "- ")
+        write("Player "); write(player.toString()); write(" keeps both cards"); nl
+      }
+    }
+  }
+
+  def draw_player_card(player: Int, cardToKeep: String, cardToDiscard: String) = {
+    add_player_text(player, "\u00b1 ") // Plus-or-minus
+    write("Player "); write(player.toString()); write(" draws a card"); nl
+    gPlayerAmountDraws(player) += 1
+    discard(cardToDiscard)
+    gPlayerHand(player) = (cardToKeep, gCardEmpty)
+    deal_a_card(player)
+  }
 
   /*
-  player_round(keep, P, N, _, _, _) :-
-	add_player_text(P, "- "), !,
-	write("Player "), write(P), write(" keeps both cards"), nl,
-	next(P, NP),
-	N1 is N - 1,
-	player_round(draw, NP, N1, 0, 0, 0).
   player_round(high, P, N, _, _, _) :-
 	add_player_text(P, "± "), !,  % Plus-or-minus 
 	write("Player "), write(P), write(" draws a card"), nl,
@@ -306,6 +336,25 @@ object PokerTable {
         val actionBetAmount = get_action_bet_index(index, remainingBets)
   	    
   	    return actionBetAmount
+      }
+    }
+  }
+  
+  def get_action_draw(mode: String, player: Int): String = {
+    mode match {
+      case "human" => {
+  	    val action = draw_menu
+  	    
+  	    return action
+      }
+      case "checker" => {
+        return "keep"
+      }
+      case _ => {  // "random"
+        val index = random_int(3) - 1
+        val action = get_action_draw_index(index)
+  	    
+  	    return action
       }
     }
   }
@@ -510,10 +559,10 @@ object PokerTable {
     return actionBetAmount
   }
   
-  def get_action_draw_choice(choice: Int): String = {
-    val action = choice match {
-      case 1 => "low"
-      case 2 => "high"
+  def get_action_draw_index(index: Int): String = {
+    val action = index match {
+      case 1 => "high"
+      case 2 => "low"
       case _ => "keep"
     }
     
@@ -563,7 +612,6 @@ object PokerTable {
       }
     }
   }
-
   
   // Returns (action, betAmount)
   def bet_choice(choice: Int): (String, Int) = {
@@ -577,6 +625,30 @@ object PokerTable {
     }
     
     return actionBetAmount
+  }
+
+  def draw_menu: String = {
+    val (c1, c2) = gPlayerHand(gPlayerHuman)
+    val discard1 = "Discard " + c1
+    val discard2 = "Discard " + c2
+    val choice = menu(" Draw? ",
+      List(
+        "Keep",
+        discard1,
+        discard2))
+    val action = draw_choice(choice)
+    return action
+  }
+
+  def draw_choice(choice: Int): String = {
+    val action = choice match {
+      case 0 => "keep"
+      case 1 => "keep"
+      case 2 => "high"
+      case 3 => "low"
+    }
+
+    return action
   }
 
   def deal_cards_start = {
@@ -610,22 +682,20 @@ object PokerTable {
 
   def discard_player_hand(p: Int) = {
     val (c1, c2)  = gPlayerHand(p)
-
-    val c1hi = card_high_value(c1)
-    val c1lo = card_low_value(c1)
-
-    val c2hi = card_high_value(c2)
-    val c2lo = card_low_value(c2)
-
-    if (c1hi > 0) {
-      gCardDeckDiscard ::= (c1, c1hi, c1lo)
-    }
-
-    if (c2hi > 0) {
-      gCardDeckDiscard ::= (c2, c2hi, c2lo)
-    }
+    
+    discard(c1)
+    discard(c2)
     
     gPlayerHand(p) = gHandFolded
+  }
+  
+  def discard(card: String) = {
+    val hi = card_high_value(card)
+    val lo = card_low_value(card)
+
+    if (hi > 0) {
+      gCardDeckDiscard ::= (card, hi, lo)
+    }
   }
 
   def deal_a_card(p: Int) = {
@@ -704,7 +774,7 @@ object PokerTable {
     
     bestHighHands foreach (pv => {
       val (player, value) = pv
-      gPlayerAmountLow(player) += 1
+      gPlayerAmountHigh(player) += 1
       text_cursor(player, 5); text_write("\u25b2")  // Up-arrow
       pay_winner(player, "high", highPotPerPlayer)
     })
@@ -745,7 +815,7 @@ object PokerTable {
     val value = (hilo, hand) match {
       case (_, ("x", _)) => {
         // Player has folded.
-        return -99000
+        return gWorstBetValue
       }
       
       case ("high", ("2", "2")) => {
@@ -830,7 +900,7 @@ object PokerTable {
       
       case _ => {
         // Safety net.
-        return -99000
+        return gWorstBetValue
       }
     }
     
@@ -1120,7 +1190,7 @@ object PokerTable {
     return mutableMap
   }
 
-  // TODO: Store player hand as Tuple2[Tuple3[String, Int, Int], Tuple3[String, Int, Int]].
+  // TODO: (?) Store player hand as Tuple2[Tuple3[String, Int, Int], Tuple3[String, Int, Int]].
   def new_player_hand_map: collection.mutable.Map[Int, Tuple2[String, String]] = {
     val handMap = (1 to gPlayerCount) map(p => (p, gHandEmpty)) toMap
     var mutableMap = collection.mutable.Map(handMap.toSeq: _*)
@@ -1128,7 +1198,7 @@ object PokerTable {
     return mutableMap
   }
 
-  // TODO: Remove this if/when player hand includes each card as Tuple3[String, Int, Int].
+  // TODO: (?) Remove this if/when player hand includes each card as Tuple3[String, Int, Int].
   def card_low_value(card: String): Int = {
     val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
     val (c, hi, lo) = optionCard.getOrElse(gCardEmpty, 0, 0)
@@ -1136,7 +1206,7 @@ object PokerTable {
     return lo
   }
   
-  // TODO: Remove this if/when player hand includes each card as Tuple3[String, Int, Int].
+  // TODO: (?) Remove this if/when player hand includes each card as Tuple3[String, Int, Int].
   def card_high_value(card: String): Int = {
     val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
     val (c, hi, lo) = optionCard.getOrElse(gCardEmpty, 0, 0)
