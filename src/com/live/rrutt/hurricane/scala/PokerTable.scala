@@ -12,6 +12,7 @@ object PokerTable {
   val gCardFolded = "x"
   val gHandEmpty = (gCardEmpty, gCardEmpty)
   val gHandFolded = (gCardFolded, gCardEmpty)
+  val gHighLowList = List("high", "low")
   
   val gCardSuit = List(
     ("A", 14, 1), // High, Low value 
@@ -41,6 +42,7 @@ object PokerTable {
   var gPotAmount = 0
   var gHandNumber = 0
   var gDrawCount = 0
+  var gPlayerBestHands = new_player_best_hand_map
   
   var gPlayerPeek = false
   
@@ -146,7 +148,7 @@ object PokerTable {
     val firstPlayerToAct = next_player(gPlayerDealer)
 //  	player_round_draw(firstPlayerToAct, gPlayerCount)
   	show_players_deal
-	ask_ok_1(" (Here is where we could draw a card.) ")  // TODO: Temporary marker prompt.
+	ask_ok_1(" (Draw cards...) ")  // TODO: Temporary marker prompt.
   }
 
   def player_round_bet(player: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): Unit = {
@@ -195,7 +197,7 @@ object PokerTable {
   def process_player_bet_action(player: Int, action: String, betAmount: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): Unit = {
     action match {
       case "raise" => {
-        gPlayerText(player) += ("+" + betAmount.toString())
+        add_player_text(player, "+" + betAmount.toString())
         totalBet match {
           case 0 => {
             write("Player "); write(player.toString()); write(" bets $"); write(betAmount.toString()); nl
@@ -218,7 +220,7 @@ object PokerTable {
             process_player_bet_action(player, "call", 0, remainingPlayers, remainingBets, 0)
           }
           case _ => {
-            gPlayerText(player) += "x "
+            add_player_text(player, "x ")
             write("Player "); write(player.toString()); write(" folds"); nl
             discard_player_hand(player)
             text_cursor(player, 3); text_write(gCardFolded); text_write(gCardEmpty)
@@ -232,13 +234,13 @@ object PokerTable {
         val playerBet = gPlayerAmountBet(player)
         playerBet match {
           case b if b == totalBet => {
-            gPlayerText(player) += "# "
+            add_player_text(player, "# ")
             write("Player "); write(player.toString()); write(" checks"); nl
           }
           case _ => {
             val callAmount = totalBet - playerBet
             make_player_bet(player, callAmount)
-            gPlayerText(player) += ("=" + callAmount.toString())
+            add_player_text(player, "=" + callAmount.toString())
             write("Player "); write(player.toString()); write(" calls $"); write(callAmount.toString()); nl
           }
         }
@@ -309,20 +311,6 @@ object PokerTable {
   }
 
   /*
-  get_action(bet, random, P, _, R, T, ACT, B) :-
-  	N is random_int(5),
-  	get_action(bet, index, P, N, R, T, ACT, B).
-
-  get_action(draw, random, P, _, _, _, ACT, B) :-
-  	X is random_int(3),
-  	get_action(draw, index, P, X, 0, 0, ACT, B).
-
-
-  get_action(bet, checker, _, _, _, _, call, 0).
-
-  get_action(draw, checker, _, _, _, _, keep, 0).
-
-
   get_action(bet, pairwise, P, _, _, _, raise, 3) :-  % Raise on wild 
   	player_hand(P, _, '2'), !.
   get_action(bet, pairwise, P, _, _, _, raise, 3) :-  % Raise on A,K,Q pair 
@@ -684,64 +672,182 @@ object PokerTable {
   }
 
   def decide_hands = {
+    gPlayerBestHands = new_player_best_hand_map
+    
+    for (p <- 1 to gPlayerCount) {
+      val hand = gPlayerHand(p)
+
+      gHighLowList.foreach(hilo => {
+        val handValue = hand_value(hand, hilo)
+        decide_player_hand(p, hilo, handValue)
+      })
+    }
+
+    val bestLowHands = gPlayerBestHands("low")
+    val lowWinnerCount = bestLowHands.size
+    
+    val bestHighHands = gPlayerBestHands("high")
+    val highWinnerCount = bestHighHands.size
+
+    val lowPot = gPotAmount / 2  // Truncated; odd extra goes to high pot.
+    val lowPotPerPlayer = lowPot / lowWinnerCount  // Again, odd extra goes to high pot.
+    
+    val highPot = gPotAmount - (lowPotPerPlayer * lowWinnerCount)
+    val highPotPerPlayer = highPot / highWinnerCount  // Odd extra remains as extra ante.
+    
+    bestLowHands foreach (pv => {
+      val (player, value) = pv
+      gPlayerAmountLow(player) += 1
+      text_cursor(player, 2); text_write("\u25bc")  // Down-arrow
+      pay_winner(player, "low", lowPotPerPlayer)
+    })
+    
+    bestHighHands foreach (pv => {
+      val (player, value) = pv
+      gPlayerAmountLow(player) += 1
+      text_cursor(player, 5); text_write("\u25b2")  // Up-arrow
+      pay_winner(player, "high", highPotPerPlayer)
+    })
+    
 	show_players_pot
 	show_players_human
     gPlayerDealer = next_player(gPlayerDealer)
   	deal_cards_done
   	shuffle_deck_old
   }
-/*  
-  decide_hands :-
-  	player_hand_score(P, HL, V),
-  		retract_player_hand_score(P, HL, V),
-  		fail.  % Loop to erase old scores 
-  decide_hands :-
-  	player_hand(P, C1, C2),
-  		hand_value(high, C1,C2, VH),
-  		decide_player_hand(P, high, VH),
-  		hand_value(low,  C1,C2, VL),
-  		decide_player_hand(P, low, VL),
-  		fail.  % Loop for all hands 
-  decide_hands :-
-  	player_hand_score(P, low, _),
-  		add_player_amt(P, low, 1),
-  		text_cursor(P, 2),
-  		text_write("▼"),
-  		fail.  % Loop for any ties 
-  decide_hands :-
-  	player_hand_score(P, high, _),
-  		add_player_amt(P, high, 1),
-  		text_cursor(P, 5),
-  		text_write("▲"),
-  		fail.  % Loop for any ties 
-  decide_hands :-  % Terminate loop 
-	findall(P, player_hand_score(P, low,  _), LP_LIST),
-	pay_winners(count, low, LP_LIST, 0, NL),
-	findall(P, player_hand_score(P, high, _), HP_LIST),
-	pay_winners(count, high, HP_LIST, 0, NH),
-	player_amt(0, pot, A),
-	AL is (A // 2) // NL,  % Odd extra goes to High winners 
-	AH is (A - (AL * NL)) // NH,  % Odd breakage stays as ante 
-	pay_winners(pay, low, LP_LIST, AL, _),
-	pay_winners(pay, high, HP_LIST, AH, _),
-	show_players(pot),
-	show_players(human),
-  	set_player(dealer),
-  	deal_cards(done),
-  	shuffle_deck(old).
-*/
+  
+  def pay_winner(player: Int, hilo: String, amount: Int) = {
+    gPlayerAmountStake(player) += amount
+    gPotAmount -= amount
+    add_player_text(player, " $" + amount.toString())
+  	write("Player "); write(player.toString()); write(" wins $"); write(amount.toString()); write(" for "); write(hilo); write(" hand"); nl
+  }
+  
+  def decide_player_hand(player: Int, hilo: String, handValue: Int) = {
+    val bestHands = gPlayerBestHands(hilo)
+    val betterHandCount = bestHands count {case (p, v) => v > handValue}
+    
+    if (betterHandCount == 0) {
+      // We are the best hand.
+      
+      val worseHandCount = bestHands count {case (p, v) => v < handValue}
+      if (worseHandCount == 0) {
+        // We may be tied with other hands.
+        gPlayerBestHands(hilo) = (player, handValue) :: bestHands
+      } else {
+        // We are the only best hand (so far).
+         gPlayerBestHands(hilo) = List((player, handValue))
+      }
+    }
+  }
+  
+  def hand_value(hand: Tuple2[String, String], hilo: String): Int = {
+    val value = (hilo, hand) match {
+      case (_, ("x", _)) => {
+        // Player has folded.
+        return -99000
+      }
+      
+      case ("high", ("2", "2")) => {
+        // Wild pair = aces.
+        val aceValue = card_high_value("A")
+        return 1000 * aceValue
+      }
+      case ("high", (c, "2")) => {
+        // Wild makes pair.        
+        val cardValue = card_high_value(c)
+        return 1000 * cardValue
+      }
+      case ("high", ("2", c)) => {
+        // Wild makes pair.        
+        val cardValue = card_high_value(c)
+        return 1000 * cardValue
+      }
+      case ("high", (c1, c2)) if c1.equals(c2) => {
+        // Pair.        
+        val cardValue = card_high_value(c1)
+        return 1000 * cardValue
+      }
+      case ("high", (c1, c2)) if card_high_value(c1) > card_high_value(c2) => {
+        // High card c1.    
+        val cardValue1 = card_high_value(c1)
+        val cardValue2 = card_high_value(c2)
+        return (20 * cardValue1) + cardValue2
+      }
+      case ("high", (c1, c2)) => {
+        // High card c2. (Should never occur due to card sorting, but cover if it does.)  
+        val cardValue1 = card_high_value(c1)
+        val cardValue2 = card_high_value(c2)
+        return (20 * cardValue2) + cardValue1
+      }
+      
+      case ("low", ("2", "2")) => {
+        // Wild pair = low aces.
+        val aceValue = card_low_value("A")
+        return - (1000 * aceValue)
+      }
+      case ("low", ("A", "2")) => {
+        // Wild treated as two.       
+        val cardValue1 = card_low_value("2")
+        val cardValue2 = card_low_value("A")
+        return - ((20 * cardValue1) + cardValue2)
+      }
+      case ("low", ("2", "A")) => {
+        // Wild treated as two. (Should never occur due to card sorting, but cover if it does.)       
+        val cardValue1 = card_low_value("2")
+        val cardValue2 = card_low_value("A")
+        return - ((20 * cardValue1) + cardValue2)
+      }
+      case ("low", (c, "2")) => {
+        // Wild treated as Ace, so 23 ties with A3.       
+        val cardValue1 = card_low_value(c)
+        val cardValue2 = card_low_value("A")
+        return - ((20 * cardValue1) + cardValue2)
+      }
+      case ("low", ("2", c)) => {
+        // Wild treated as Ace, so 23 ties with A3. (Should never occur due to card sorting, but cover if it does.)      
+        val cardValue1 = card_low_value(c)
+        val cardValue2 = card_low_value("A")
+        return - ((20 * cardValue1) + cardValue2)
+      }
+      case ("low", (c1, c2)) if c1.equals(c2) => {
+        // Low pair.        
+        val cardValue = card_low_value(c1)
+        return - (1000 * cardValue)
+      }
+      case ("low", (c1, c2)) if card_low_value(c1) > card_low_value(c2) => {
+        // High card c1.      
+        val cardValue1 = card_low_value(c1)
+        val cardValue2 = card_low_value(c2)
+        return - ((20 * cardValue1) + cardValue2)
+      }
+      case ("low", (c1, c2)) => {
+        // High card c2. (Should never occur due to card sorting, but cover if it does.)
+        val cardValue1 = card_low_value(c1)
+        val cardValue2 = card_low_value(c2)
+        return - ((20 * cardValue2) + cardValue1)
+      }
+      
+      case _ => {
+        // Safety net.
+        return -99000
+      }
+    }
+    
+    return value
+  }
 
   def game_over(choice: Int): Boolean = {
-    val result = choice match {
+    val gameIsOver = choice match {
       case 4 => true
       case _ => false
     }
     
-    if (result) {
+    if (gameIsOver) {
       end_of_game
     }
     
-    return result
+    return gameIsOver
   }
   
   def end_of_game = {
@@ -1002,6 +1108,11 @@ object PokerTable {
     return mutableMap
   }
   
+  def add_player_text(player: Int, text: String) = {
+    gPlayerText(player) += text
+    text_cursor(player, 6); text_write(gPlayerText(player))
+  }
+  
   def new_player_amount_map(initialValue: Int): collection.mutable.Map[Int, Int] = {    
     val amountMap = (1 to gPlayerCount) map(p => (p, initialValue)) toMap
     var mutableMap = collection.mutable.Map(amountMap.toSeq: _*)
@@ -1031,5 +1142,15 @@ object PokerTable {
     val (c, hi, lo) = optionCard.getOrElse(gCardEmpty, 0, 0)
     
     return hi
+  }
+  
+  // Maps from "high" vs. "low" to List[Player, Value].
+  def new_player_best_hand_map: collection.mutable.Map[String, List[(Int, Int)]] = {
+    val emptyHandList = List[(Int, Int)]()
+    
+    val handListMap = gHighLowList.map(hilo => (hilo, emptyHandList)) toMap
+    var mutableMap = collection.mutable.Map(handListMap.toSeq: _*)
+    
+    return mutableMap
   }
 }
