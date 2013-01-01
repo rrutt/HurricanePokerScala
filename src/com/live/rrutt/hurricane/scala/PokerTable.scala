@@ -7,7 +7,7 @@ import com.live.rrutt.ui._
 object PokerTable {
   val gMaxBetsPerRound = 3
   val gPlayerCount = 8
-  val gPlayerInitialStake = 100
+  val gPlayerInitialStake = 10 // 100
   val gWorstBetValue = -99000
   val gCardEmpty = " "
   val gCardFolded = "x"
@@ -79,10 +79,27 @@ object PokerTable {
   
   def main_loop: Unit = {
     peekaboo
-    val choice = main_menu
-    if (game_over(choice)) {
-      return
+
+    val brokePlayerCount = gPlayerAmountStake count { case (p, v) => v <= 0 }
+    brokePlayerCount match {
+      case 0 => {
+        val choice = main_menu
+        if (game_over(choice)) {
+          return
+        }
+      }
+      case 1 => {
+        ask_ok_1(" A player is busted. ")
+        end_of_game
+        return
+      }
+      case n => {
+        ask_ok_1(" " + n.toString() + " players are busted. ")
+        end_of_game
+        return
+      }
     }
+    
     main_loop
   }
 
