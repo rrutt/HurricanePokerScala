@@ -206,27 +206,35 @@ object PokerTable {
   def process_player_bet_action(player: Int, action: String, betAmount: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): Unit = {
     action match {
       case "raise" => {
-        add_player_text(player, "+" + betAmount.toString())
-        totalBet match {
+        remainingBets match {
           case 0 => {
-            write("Player "); write(player.toString()); write(" bets $"); write(betAmount.toString()); nl
+            // Convert "raise" to "call".
+            process_player_bet_action(player, "call", 0, remainingPlayers, remainingBets, totalBet)
           }
           case _ => {
-            write("Player "); write(player.toString()); write(" raises $"); write(betAmount.toString()); nl
+            add_player_text(player, "+" + betAmount.toString())
+            totalBet match {
+              case 0 => {
+                write("Player "); write(player.toString()); write(" bets $"); write(betAmount.toString()); nl
+              }
+              case _ => {
+                write("Player "); write(player.toString()); write(" raises $"); write(betAmount.toString()); nl
+              }
+            }
+            make_player_bet(player, betAmount)
+            val nextPlayer = next_player(player)
+            val stillRemainingPlayers = gPlayerCount - 1
+            val stillRemainingBets = remainingBets - 1
+            val newTotalBet = totalBet + betAmount
+            player_round_bet(nextPlayer, stillRemainingPlayers, stillRemainingBets, newTotalBet)
           }
         }
-        make_player_bet(player, betAmount)
-        val nextPlayer = next_player(player)
-        val stillRemainingPlayers = gPlayerCount - 1
-        val stillRemainingBets = remainingBets - 1
-        val newTotalBet = totalBet + betAmount
-        player_round_bet(nextPlayer, stillRemainingPlayers, stillRemainingBets, newTotalBet)
       }
       case "fold" => {
         totalBet match {
           case 0 => {
             // Convert "fold" to "call".
-            process_player_bet_action(player, "call", 0, remainingPlayers, remainingBets, 0)
+            process_player_bet_action(player, "call", 0, remainingPlayers, remainingBets, totalBet)
           }
           case _ => {
             add_player_text(player, "x ")
@@ -287,37 +295,10 @@ object PokerTable {
     deal_a_card(player)
   }
 
-  /*
-  player_round(high, P, N, _, _, _) :-
-	add_player_text(P, "± "), !,  % Plus-or-minus 
-	write("Player "), write(P), write(" draws a card"), nl,
-	add_player_amt(0, draws, 1),
-	player_hand(P, C1, C2),
-	retract_player_hand(P, C1, C2),
-	assertz(player_hand(P, C2, '*')),
-	denomination_value(C1, D1, _),  % Use "high" value 
-	assertz_card_deck(discard, D1),
-	deal_a_card(P),
-	next(P, NP),
-	N1 is N - 1,
-	player_round(draw, NP, N1, 0, 0, 0).
-  player_round(low, P, N, _, _, _) :-
-	add_player_text(P, "± "), !,  % Plus-or-minus 
-	write("Player "), write(P), write(" draws a card"), nl,
-	add_player_amt(0, draws, 1),
-	player_hand(P, C1, C2),
-	retract_player_hand(P, C1, C2),
-	assertz(player_hand(P, C1, '*')),
-	denomination_value(C2, D2, _),  % Use "high" value 
-	assertz_card_deck(discard, D2),
-	deal_a_card(P),
-	next(P, NP),
-	N1 is N - 1,
-	player_round(draw, NP, N1, 0, 0, 0).
-	*/
-
   // Returns (action, betAmount)
   def get_action_bet(mode: String, player: Int, remainingPlayers: Int, remainingBets: Int, totalBet: Int): (String, Int) = {
+    val hand = gPlayerHand(player)
+    
     mode match {
       case "human" => {
         show_players_pot
@@ -331,6 +312,159 @@ object PokerTable {
       case "checker" => {
         return ("call", 0)
       }
+      case "highrise" => {
+        hand match {
+          case (_, "2") => {
+            // Raise on wild.
+            return ("raise", 3)
+          }
+          case (c1, c2) if c1.equals(c2) && (card_high_value(c1) > 11) => {
+            // Raise on A, K, Q pair.
+            return ("raise", 3)
+          }
+          case (c1, c2) if c1.equals(c2) => {
+            // Raise on any other pair.
+            return ("raise", 2)
+          }
+          case (c1, _) if (card_high_value(c1) > 11) => {
+            // Raise on unpaired A, K, Q.
+            return ("raise", 1)
+          }
+          case (c1, _) if (card_high_value(c1) < 10) && (gPlayerAmountDraws(player) == 0) => {
+            // Fold on unpaired poor high card if before draw.
+            return ("fold", 0)
+          }
+          case (c1, _) if ((6 to 11) contains card_high_value(c1)) && (gPlayerAmountDraws(player) > 0) => {
+            // Fold on unpaired medium high card if after draw.
+            return ("fold", 0)
+          }
+          case (_, _) if (gPlayerAmountDraws(player) == 0) => {
+            // Defensive raise if before draw.
+            return ("raise", 1)
+          }
+          case (_, _) if (totalBet > 6) &&  (gPlayerAmountDraws(player) > 0) => {
+            // Fold if REALLY BIG bet after draw.
+            return ("fold", 0)
+          }
+          case _ => {
+            return ("call", 0)
+          }
+        }        
+      }
+      case "pairwise" => {
+        hand match {
+          case (_, "2") => {
+            // Raise on wild.
+            return ("raise", 3)
+          }
+          case (c1, c2) if c1.equals(c2) && (card_high_value(c1) > 11) => {
+            // Raise on A, K, Q pair.
+            return ("raise", 3)
+          }
+          case (c1, c2) if c1.equals(c2) => {
+            // Raise on any other pair.
+            return ("raise", 2)
+          }
+          case (c1, _) if (card_high_value(c1) > 10) => {
+            // Raise on unpaired face card.
+            return ("raise", 1)
+          }
+          case (_, _) if (gPlayerAmountDraws(player) == 0) => {
+            // Defensive raise if before draw.
+            return ("raise", 1)
+          }
+          case (_, _) if (totalBet > 2) &&  (gPlayerAmountDraws(player) > 0) => {
+            // Fold if big bet after draw.
+            return ("fold", 0)
+          }
+          case _ => {
+            return ("call", 0)
+          }
+        }
+      }
+      case "lowdown" => {
+        hand match {
+          case ("A", "2") => {
+            // Raise on Acey-Duecy.
+            return ("raise", 3)
+          }
+          case ("A", _) => {
+            // Raise on Ace.
+            return ("raise", 2)
+          }
+          case (c1, _) if (card_high_value(c1) < 7) => {
+            // Raise on low high card.
+            return ("raise", 1)
+          }
+          case (c1, c2) if (!c1.equals(c2)) && (card_high_value(c2) > 6) && (gPlayerAmountDraws(player) == 0) => {
+            // Fold on unpaired high low card before draw.
+            return ("fold", 0)
+          }
+          case (c1, c2) if (!c1.equals(c2)) && (card_high_value(c2) > 6) && (totalBet > 1) && (gPlayerAmountDraws(player) > 0) => {
+            // Fold on unpaired high low card after draw and big bet
+            return ("fold", 0)
+          }
+          case _ => {
+            return ("call", 0)
+          }
+        }
+      }
+      case "hilo" => {
+        hand match {
+          case ("A", "2") => {
+            // Raise on Acey-Duecy.
+            return ("raise", 3)
+          }
+          case ("A", _) => {
+            // Raise on Ace.
+            return ("raise", 2)
+          }
+          case (c1, _) if (card_high_value(c1) < 7) => {
+            // Raise on low high card.
+            return ("raise", 1)
+          }
+          case (c1, c2) if (!c1.equals(c2)) && ((7 to 9) contains card_high_value(c1)) && ((7 to 9) contains card_high_value(c2)) && (totalBet > 1) => {
+            // Fold if unpaired medium cards and big bet.
+            return ("fold", 0)
+          }
+          case (c1, c2) if (!c1.equals(c2)) && ((7 to 9) contains card_high_value(c1)) && ((7 to 9) contains card_high_value(c2)) => {
+            // Defensive raise if unpaired medium cards and small bet.
+            return ("raise", 1)
+          }
+          case _ => {
+            // Else same as highrise.
+            val actionBetAmount = get_action_bet("highrise", player, remainingPlayers, remainingBets, totalBet)
+            
+            return actionBetAmount
+          }
+        }
+      }
+      case "foldout" => {
+        hand match {
+          case ("A", "2") => {
+            // Raise on Acey-Duecy.
+            return ("raise", 3)
+          }
+          case ("A", _) => {
+            // Raise on Ace.
+            return ("raise", 2)
+          }
+          case (c1, _) if (card_high_value(c1) < 6) => {
+            // Raise on low high card.
+            return ("raise", 1)
+          }
+          case (c1, c2) if (!c1.equals(c2)) && ((6 to 11) contains card_high_value(c1)) && ((6 to 11) contains card_high_value(c2)) => {
+            // Fold if unpaired medium cards regardless of bet.
+            return ("fold", 0)
+          }
+          case _ => {
+            // Else same as hilo.
+            val actionBetAmount = get_action_bet("hilo", player, remainingPlayers, remainingBets, totalBet)
+            
+            return actionBetAmount
+          }
+        }
+      }
       case _ => {  // "random"
         val index = random_int(5) - 1
         val actionBetAmount = get_action_bet_index(index, remainingBets)
@@ -341,6 +475,8 @@ object PokerTable {
   }
   
   def get_action_draw(mode: String, player: Int): String = {
+    val hand = gPlayerHand(player)
+    
     mode match {
       case "human" => {
   	    val action = draw_menu
@@ -350,6 +486,76 @@ object PokerTable {
       case "checker" => {
         return "keep"
       }
+      case "highrise" => {
+        hand match {
+          case (c1, c2) if c1.equals(c2) => {
+            // Keep a pair.
+            return "keep"
+          }
+          case (c1, "2") if (card_high_value(c1) > 10) => {
+            // Keep a face card wild pair.
+            return "keep"
+          }
+          case (_, "2") => {
+            // Toss "high" card to try for a higher wild pair.
+            return "high"
+          }
+          case _ => {
+            // Toss the lowest card.
+            return "low"
+          }
+        }
+      }
+      case "pairwise" => {
+        // Same as highrise.
+        val action = get_action_draw("highrise", player)
+        
+        return action
+      }
+      case "lowdown" => {
+        hand match {
+          case ("A", "2") => {
+            // Keep Acey-Deucey.
+            return "keep"
+          }
+          case (c1, _) if (card_low_value(c1) < 7) => {
+            // Keep low-valued "high" card.
+            return "keep"
+          }
+          case _ => {
+            // Toss high card.
+            return "high"
+          }
+        }
+      }
+      case "hilo" => {
+        hand match {
+          case ("A", "2") => {
+            // Keep Acey-Deucey.
+            return "keep"
+          }
+          case (c1, _) if (card_low_value(c1) < 7) => {
+            // Keep low-valued "high" card.
+            return "keep"
+          }
+          case (c1, c2) if (!c1.equals(c2)) && (card_high_value(c1) < 12) && (card_low_value(c2) < 6) => {
+            // Toss unpaired poor high card if good low card.
+            return "high"
+          }
+          case _ => {
+            // Else same as highrise.
+            val action = get_action_draw("highrise", player)
+
+            return action
+          }
+        }
+      }
+      case "foldout" => {
+        // Same as hilo.
+        val action = get_action_draw("hilo", player)
+
+        return action
+      }
       case _ => {  // "random"
         val index = random_int(3) - 1
         val action = get_action_draw_index(index)
@@ -358,193 +564,6 @@ object PokerTable {
       }
     }
   }
-
-  /*
-  get_action(bet, pairwise, P, _, _, _, raise, 3) :-  % Raise on wild 
-  	player_hand(P, _, '2'), !.
-  get_action(bet, pairwise, P, _, _, _, raise, 3) :-  % Raise on A,K,Q pair 
-  	player_hand(P, C1, C2),
-  	C1 = C2,
-	denomination_value(C1, D1, _),  % Use "high" value 
-	D1 > 11, !.  	
-  get_action(bet, pairwise, P, _, _, _, raise, 2) :-  % Raise on pair 
-  	player_hand(P, C1, C2),
-  	C1 = C2, !.
-  get_action(bet, pairwise, P, _, _, _, raise, 1) :-  % Raise on face card 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D > 10, !.  	
-  get_action(bet, pairwise, _, _, _, _, raise, 1) :-  % Defensive raise 
-  	player_amt(0, draws, 0), !.  % Only before draw 
-  get_action(bet, pairwise, _, _, _, T, fold, 0) :-  % Fold if big bet without pair 
-  	player_amt(0, draws, N), N > 0,  % Only after draw 
-  	T > 2, !.
-  get_action(bet, pairwise, _, _, _, _, call, 0).
-
-  get_action(draw, pairwise, P, N, R, T, ACT, B) :-  % Same as highrise 
-	get_action(draw, highrise, P, N, R, T, ACT, B).
-
-
-  get_action(bet, highrise, P, _, _, _, raise, 3) :-  % Raise on wild 
-  	player_hand(P, _, '2'), !.
-  get_action(bet, highrise, P, _, _, _, raise, 3) :-  % Raise on A,K,Q pair 
-  	player_hand(P, C1, C2),
-  	C1 = C2,
-	denomination_value(C1, D1, _),  % Use "high" value 
-	D1 > 11, !.  	
-  get_action(bet, highrise, P, _, _, _, raise, 2) :-  % Raise on pair 
-  	player_hand(P, C1, C2),
-  	C1 = C2, !.
-  get_action(bet, highrise, P, _, _, _, raise, 1) :-  % Raise on A,K,Q 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D > 11, !.
-  get_action(bet, highrise, P, _, _, _, fold, 0) :-  % Fold if poor high card 
-  	player_amt(0, draws, 0),  % Only before draw 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	D1 < 10, !.
-  get_action(bet, highrise, P, _, _, _, fold, 0) :-  % Fold if "medium" 
-  	player_amt(0, draws, N), N > 0,  % Only after draw 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	D1 > 5, D1 < 12, !.
-  get_action(bet, highrise, _, _, _, _, raise, 1) :-  % Defensive raise 
-  	player_amt(0, draws, 0), !.  % Only before draw 
-  get_action(bet, highrise, _, _, _, T, fold, 0) :-  % Fold if BIG bet 
-  	player_amt(0, draws, N), N > 0,  % Only after draw 
-  	T > 6, !.
-  get_action(bet, highrise, _, _, _, _, call, 0) :- !.
-
-  get_action(draw, highrise, P, _, _, _, keep, 0) :-  % Hold on pair 
-  	player_hand(P, C1, C2),
-  	C1 = C2, !.
-  get_action(draw, highrise, P, _, _, _, keep, 0) :-  % Hold on wild, face 
-  	player_hand(P, C, '2'),
-	denomination_value(C, D, _),  % Use "high" value 
-	D > 10, !.
-  get_action(draw, highrise, P, _, _, _, high, 0) :-  % Try for higher wild 
-  	player_hand(P, _, '2'), !.
-  get_action(draw, highrise, _, _, _, _, low, 0).  % Toss low card 
-
-
-  get_action(bet, lowdown, P, _, _, _, raise, 3) :-
-  	player_hand(P, 'A', '2'), !.
-  get_action(bet, lowdown, P, _, _, _, raise, 2) :-
-  	player_hand(P, 'A', _), !.
-  get_action(bet, lowdown, P, _, _, _, raise, 1) :-  % Raise on low hi-card 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D < 7, !.
-  get_action(bet, lowdown, P, _, _, _, fold, 0) :-  % Fold if high low-card 
-  	player_amt(0, draws, 0),  % Only before draw 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C2, D2, _),  % Use "high" value 
-	D2 > 6, !.
-  get_action(bet, lowdown, P, _, _, T, fold, 0) :-  % Fold if not low and big bet 
-  	player_amt(0, draws, N), N > 0,  % Only after draw 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	D1 > 6,
-	T > 1, !.
-  get_action(bet, lowdown, _, _, _, _, call, 0).
-
-  get_action(draw, lowdown, P, _, _, _, keep, 0) :-
-  	player_hand(P, 'A', '2'), !.
-  get_action(draw, lowdown, P, _, _, _, keep, 0) :-  % Hold if low hi-card 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D < 7, !.
-  get_action(draw, lowdown, _, _, _, _, high, 0).
-
-
-  get_action(bet, hilo, P, _, _, _, raise, 3) :-
-  	player_hand(P, 'A', '2'), !.
-  get_action(bet, hilo, P, _, _, _, raise, 2) :-
-  	player_hand(P, 'A', _), !.
-  get_action(bet, hilo, P, _, _, _, raise, 2) :-  % Raise on low hi-card 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D < 7, !.
-  get_action(bet, hilo, P, _, _, T, fold, 0) :-  % Fold if both medium and big bet 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	denomination_value(C2, D2, _),  % Use "high" value 
-	D1 > 6, D1 < 10,
-	D2 > 6, D2 < 10,
-	T > 1, !.
-  get_action(bet, hilo, P, _, _, _, raise, 1) :-  % Defensive raise if both medium 
-  	player_amt(0, draws, N), N > 0,  % Only after draw 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	denomination_value(C2, D2, _),  % Use "high" value 
-	D1 > 6, D1 < 10,
-	D2 > 6, D2 < 10, !.
-  get_action(bet, hilo, P, N, R, T, ACT, B) :-  % Else, same as highrise 
-	get_action(bet, highrise, P, N, R, T, ACT, B).
-
-  get_action(draw, hilo, P, _, _, _, keep, 0) :-
-  	player_hand(P, 'A', '2'), !.
-  get_action(draw, hilo, P, _, _, _, keep, 0) :-  % Hold if low hi-card 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D < 6, !.
-  get_action(draw, hilo, P, _, _, _, high, 0) :-  % Discard poor high if good low card 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Hold on pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	denomination_value(C2, D2, _),
-	D1 < 12,
-	D2 < 6, !.
-  get_action(draw, hilo, P, N, R, T, ACT, B) :-  % Else, same as highrise 
-	get_action(draw, highrise, P, N, R, T, ACT, B).
-
-
-  get_action(bet, foldout, P, _, _, _, raise, 3) :-
-  	player_hand(P, 'A', '2'), !.
-  get_action(bet, foldout, P, _, _, _, raise, 2) :-
-  	player_hand(P, 'A', _), !.
-  get_action(bet, foldout, P, _, _, _, raise, 2) :-  % Raise on low hi-card 
-  	player_hand(P, C, _),
-	denomination_value(C, D, _),  % Use "high" value 
-	D < 6, !.
-  get_action(bet, foldout, P, _, _, _, fold, 0) :-  % Fold if both medium and big bet 
-  	player_hand(P, C1, C2),
-  	C1 \= C2,  % Stay on a pair 
-	denomination_value(C1, D1, _),  % Use "high" value 
-	denomination_value(C2, D2, _),  % Use "high" value 
-	D1 > 5, D1 < 12,
-	D2 > 5, D2 < 12, !.
-  get_action(bet, foldout, P, N, R, T, ACT, B) :-  % Else, same as hilo 
-	get_action(bet, hilo, P, N, R, T, ACT, B).
-
-  get_action(draw, foldout, P, N, R, T, ACT, B) :-  % Else, same as hilo 
-	get_action(draw, hilo, P, N, R, T, ACT, B).
-
-
-  get_action(bet, human, P, _, R, T, ACT, B) :-
-  	show_players(pot),
-  	show_players(human),
-  	player_amt(P, bet, PB),
-  	CB is T - PB,  % Call bet amount 
-	peekaboo,
-  	bet_menu(R, CB, ACT, B).
-
-  get_action(draw, human, P, _, _, _, ACT, 0) :-
-	peekaboo,
-  	draw_menu(P, ACT).
-
-
-  get_action(bet, _, _, _, _, _, call, 0).   % Safety net 
-
-  get_action(draw, _, _, _, _, _, keep, 0).  % Safety net 
-*/
 
   // Returns (action, betAmount)
   def get_action_bet_index(index: Int, remainingBets: Int): (String, Int) = {
