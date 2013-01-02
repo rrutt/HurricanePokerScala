@@ -1,7 +1,6 @@
 package com.live.rrutt.hurricane.scala
 
 import com.live.rrutt.hurricane.HurricanePoker
-import com.live.rrutt.prologfunctors._
 import com.live.rrutt.ui._
 
 object PokerTable {
