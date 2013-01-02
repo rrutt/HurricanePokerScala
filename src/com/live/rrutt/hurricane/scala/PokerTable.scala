@@ -7,7 +7,7 @@ import com.live.rrutt.ui._
 object PokerTable {
   val gMaxBetsPerRound = 3
   val gPlayerCount = 8
-  val gPlayerInitialStake = 10 // 100
+  val gPlayerInitialStake = 100
   val gWorstBetValue = -99000
   val gCardEmpty = " "
   val gCardFolded = "x"
@@ -78,8 +78,6 @@ object PokerTable {
   }
   
   def main_loop: Unit = {
-    peekaboo
-
     val brokePlayerCount = gPlayerAmountStake count { case (p, v) => v <= 0 }
     brokePlayerCount match {
       case 0 => {
@@ -1188,8 +1186,6 @@ object PokerTable {
     ask_ok_0
   }
   
-  def peekaboo = {}
-  
   def new_deck: List[Tuple3[String, Int, Int]] = {
     val suit1 = gCardSuit
     val suit2 = suit1 reverse
@@ -1226,7 +1222,6 @@ object PokerTable {
     return mutableMap
   }
 
-  // TODO: (?) Store player hand as Tuple2[Tuple3[String, Int, Int], Tuple3[String, Int, Int]].
   def new_player_hand_map: collection.mutable.Map[Int, Tuple2[String, String]] = {
     val handMap = (1 to gPlayerCount) map(p => (p, gHandEmpty)) toMap
     var mutableMap = collection.mutable.Map(handMap.toSeq: _*)
@@ -1234,7 +1229,6 @@ object PokerTable {
     return mutableMap
   }
 
-  // TODO: (?) Remove this if/when player hand includes each card as Tuple3[String, Int, Int].
   def card_low_value(card: String): Int = {
     val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
     val (c, hi, lo) = optionCard.getOrElse(gCardEmpty, 0, 0)
@@ -1242,7 +1236,6 @@ object PokerTable {
     return lo
   }
   
-  // TODO: (?) Remove this if/when player hand includes each card as Tuple3[String, Int, Int].
   def card_high_value(card: String): Int = {
     val optionCard = gCardSuit.find {case (c, hi, lo) => c.equals(card)}
     val (c, hi, lo) = optionCard.getOrElse(gCardEmpty, 0, 0)
