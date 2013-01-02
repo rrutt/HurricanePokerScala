@@ -1,4 +1,4 @@
-package com.live.rrutt.tuprolog.util;
+package com.live.rrutt.ui;
 
 public class MenuDialog extends javax.swing.JDialog {
 
@@ -35,7 +35,7 @@ public class MenuDialog extends javax.swing.JDialog {
 		});
 
 		jLabel1.setFont(new java.awt.Font("Arial", 0, 12));
-		jLabel1.setText(Utilities.stripQuotes(caption));
+		jLabel1.setText(caption);
 		jLabel1.setMinimumSize(new java.awt.Dimension(150, 15));
 		jLabel1.setPreferredSize(new java.awt.Dimension(150, 15));
 		getContentPane().add(jLabel1);

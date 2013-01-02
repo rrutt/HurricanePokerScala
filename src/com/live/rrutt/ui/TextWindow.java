@@ -1,4 +1,4 @@
-package com.live.rrutt.tuprolog.util;
+package com.live.rrutt.ui;
 
 /**
  * @author Rick Rutt
@@ -78,7 +78,7 @@ public class TextWindow extends javax.swing.JFrame {
 	}
 
 	public void writeText(String text) {
-		String s = Utilities.stripQuotes(text);
+		String s = text;
 		int sLength = s.length();
 
 		int lineCount = textArea.getLineCount() - 1; // Allow for empty

@@ -1,15 +1,15 @@
-package com.live.rrutt.tuprolog.util;
+package com.live.rrutt.ui;
 
-public class OkDialog extends javax.swing.JDialog {
+public class YesNoDialog extends javax.swing.JDialog {
 
-	private static final long serialVersionUID = -5042040680662232807L;
+	private static final long serialVersionUID = -5617762425406392598L;
 
-	private boolean isOk = false;
+	private boolean yes = true;
 
 	private String msg = "";
 
 	/** Creates new form OkDialog */
-	public OkDialog(java.awt.Frame parent, boolean modal, String msg) {
+	public YesNoDialog(java.awt.Frame parent, boolean modal, String msg) {
 		super(parent, modal);
 		this.msg = msg;
 		initComponents();
@@ -23,7 +23,8 @@ public class OkDialog extends javax.swing.JDialog {
 	 */
 	private void initComponents() { // GEN-BEGIN:initComponents
 		jLabel1 = new javax.swing.JLabel();
-		bOk = new javax.swing.JButton();
+		bYes = new javax.swing.JButton();
+		bNo = new javax.swing.JButton();
 
 		getContentPane().setLayout(new java.awt.FlowLayout());
 
@@ -40,21 +41,36 @@ public class OkDialog extends javax.swing.JDialog {
 		jLabel1.setPreferredSize(new java.awt.Dimension(150, 15));
 		getContentPane().add(jLabel1);
 
-		bOk.setFont(new java.awt.Font("Arial", 0, 10));
-		bOk.setText("OK");
-		bOk.addActionListener(new java.awt.event.ActionListener() {
+		bYes.setFont(new java.awt.Font("Arial", 0, 10));
+		bYes.setText("Yes");
+		bYes.addActionListener(new java.awt.event.ActionListener() {
 			public void actionPerformed(java.awt.event.ActionEvent evt) {
-				bOkActionPerformed(evt);
+				bYesActionPerformed(evt);
 			}
 		});
 
-		getContentPane().add(bOk);
+		getContentPane().add(bYes);
+
+		bNo.setFont(new java.awt.Font("Arial", 0, 10));
+		bNo.setText("No");
+		bNo.addActionListener(new java.awt.event.ActionListener() {
+			public void actionPerformed(java.awt.event.ActionEvent evt) {
+				bNoActionPerformed(evt);
+			}
+		});
+
+		getContentPane().add(bNo);
 
 		pack();
 	} // GEN-END:initComponents
 
-	private void bOkActionPerformed(java.awt.event.ActionEvent evt) { // GEN-FIRST:event_bYesActionPerformed
-		isOk = true;
+	private void bNoActionPerformed(java.awt.event.ActionEvent evt) { // GEN-FIRST:event_bNoActionPerformed
+		yes = false;
+		dispose();
+	} // GEN-LAST:event_bNoActionPerformed
+
+	private void bYesActionPerformed(java.awt.event.ActionEvent evt) { // GEN-FIRST:event_bYesActionPerformed
+		yes = true;
 		dispose();
 	} // GEN-LAST:event_bYesActionPerformed
 
@@ -64,13 +80,15 @@ public class OkDialog extends javax.swing.JDialog {
 		dispose();
 	} // GEN-LAST:event_closeDialog
 
-	public boolean isOk() {
-		return this.isOk;
+	public boolean yes() {
+		return this.yes;
 	}
 
 	// Variables declaration - do not modify//GEN-BEGIN:variables
 	private javax.swing.JLabel jLabel1;
 
-	private javax.swing.JButton bOk;
+	private javax.swing.JButton bYes;
+
+	private javax.swing.JButton bNo;
 	// End of variables declaration//GEN-END:variables
 }

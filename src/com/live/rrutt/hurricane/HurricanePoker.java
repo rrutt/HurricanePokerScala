@@ -1,55 +1,23 @@
 package com.live.rrutt.hurricane;
 
 import com.live.rrutt.hurricane.scala.PokerTable;
-import com.live.rrutt.tuprolog.lib.PrologPredicatesAndFunctors;
-import com.live.rrutt.tuprolog.util.*;
-
-import alice.tuprolog.*;
-import alice.tuprolog.event.*;
+import com.live.rrutt.ui.*;
 
 import java.io.*;
 
 public class HurricanePoker 
 		extends javax.swing.JFrame 
-		implements Serializable, OutputListener, SpyListener {
+		implements Serializable {
 
 	private static final long serialVersionUID = 2785996048582414206L;
 	
 	public static final int windowHeight = 240;
 
-    public Prolog engine;
-
-	private static String TheoryResourceName = "com/live/rrutt/hurricane/HurricanePoker.pl";
-	
-	private String theoryFilePath = null;
-
 	private javax.swing.JScrollPane outputScrollPane;
 
 	private javax.swing.JTextArea outputArea;
 
-	public HurricanePoker(String[] args) {
-		System.out.println(
-				"Rick Rutt's Hurricane Poker - Using the tuProlog system "
-				+ Prolog.getVersion()
-				);
-		
-		for (String arg : args) {
-			if ((arg.length() > 1) && (arg.charAt(0) == '-')) {
-				if (arg.equalsIgnoreCase("-peek")) {
-					PrologPredicatesAndFunctors.enablePeeking = true;
-					System.out.println("Peek output enabled.");
-				} else if (arg.equalsIgnoreCase("-spy")) {
-					PrologPredicatesAndFunctors.enableSpying = true;
-					System.out.println("Spy output enabled.");
-				} else {
-					System.out.println("Unknown command argument ignored: " + arg);
-				}
-			} else {
-				theoryFilePath = arg;
-				System.out.println("Processing theory file: " + arg);
-			}
-		}
-		
+	public HurricanePoker(String[] args) {		
 		initComponents();
 		pack();
 		
@@ -62,62 +30,6 @@ public class HurricanePoker
 		setVisible(true);
 		
 		PokerTable.PlayPoker(this);
-		exitForm(null);
-		
-		engine = new Prolog();
-		try {
-			engine.loadLibrary("com.live.rrutt.tuprolog.lib.PrologPredicatesAndFunctors");
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-		engine.addOutputListener(this);
-		engine.addSpyListener(this);
-		engine.setSpy(PrologPredicatesAndFunctors.enableSpying);
-
-		try {
-			InputStream theoryInputStream = null;
-			Theory t = null;
-			if (theoryFilePath != null) {
-				theoryInputStream = new FileInputStream(theoryFilePath);
-				t = new Theory(theoryInputStream);
-			} else {
-				ClassLoader cl = getClass().getClassLoader();
-				if (cl == null) {
-					throw new Exception("Could not get ClassLoader");
-				}
-
-				theoryInputStream = cl.getResourceAsStream(TheoryResourceName);
-				if (theoryInputStream == null) {
-					throw new Exception("Could not load theory resource: "
-							+ TheoryResourceName);
-				}
-
-				InputStreamReader isr = new InputStreamReader(theoryInputStream, "UTF-8");
-				BufferedReader br = new BufferedReader(isr);
-				StringBuffer theoryBuffer = new StringBuffer();
-
-				String s = br.readLine();
-				while (s != null) {
-					// System.out.println(s);
-					theoryBuffer.append(s);
-					theoryBuffer.append('\n');
-
-					s = br.readLine();
-				}
-
-				String theoryString = theoryBuffer.toString();
-				t = new Theory(theoryString);
-//				t = new Theory(theoryInputStream);
-			}
-			engine.setTheory(t);
-			
-			@SuppressWarnings("unused")
-			SolveInfo info = engine.solve("x.");
-//			System.out.print(info);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
 		exitForm(null);
 	}
 
@@ -158,8 +70,6 @@ public class HurricanePoker
 	}
 
 	protected void exitForm(java.awt.event.WindowEvent evt) {
-		PrologPredicatesAndFunctors.disposeTextWindow();
-				
 		this.setVisible(false);
 		this.dispose();
 		try {
@@ -174,18 +84,6 @@ public class HurricanePoker
 	public void write(String s) {
 		outputArea.append(s);
 		outputArea.setCaretPosition(outputArea.getText().length());
-	}
-
-	public void onOutput(OutputEvent ev) {
-		String s = Utilities.stripQuotes(ev.getMsg());
-		write(s);
-	}
-
-	public void onSpy(SpyEvent ev) {
-		String s = Utilities.stripQuotes(ev.getMsg());
-		System.out.print(" {Spy: ");
-		System.out.print(s);
-		System.out.print("}\n");
 	}
 
 	public static void main(String args[]) {

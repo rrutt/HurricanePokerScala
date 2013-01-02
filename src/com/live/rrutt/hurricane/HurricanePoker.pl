@@ -1,3 +1,8 @@
+/* 
+ * This is the original Prolog implementation.
+ * It is provided here only as a reference.
+ */
+  
   x :-  
 	text_title(" Hurricane Poker "),
 	write(" Hurricane is two-card draw poker,"),
