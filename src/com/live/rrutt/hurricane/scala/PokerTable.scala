@@ -68,7 +68,7 @@ object PokerTable {
 	nl;
 	shuffle_deck_new;
 	shuffle_deck_old;
-	nl; write(" Shuffled new deck. "); nl; bang;
+	nl; write(" Shuffled new deck. "); nl;
 	clear_player_amt_pot;
 	clear_player_amt_hand;
 	initialize_players;
